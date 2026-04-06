@@ -110,6 +110,13 @@ enum NotificationSoundOption: String, CaseIterable, Identifiable {
     }
 }
 
+enum LaunchAtStartupState: Equatable {
+    case enabled
+    case disabled
+    case requiresApproval
+    case unsupported
+}
+
 struct UsageWindowKey: Hashable, Sendable {
     let provider: ProviderKind
     let kind: UsageWindowKind

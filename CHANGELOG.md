@@ -6,9 +6,15 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-04-07
+
+### Added
+- Launch at startup option in the settings window
+
 ### Changed
 - The project no longer publishes a GitHub Release workflow
-- README now documents running the app locally or building a DMG with `./scripts/build-dmg.sh`
+- README now documents building a DMG with the current app version by default
+- DMG builds now clear stale Swift module caches before release builds
 
 ## [1.0.0] - 2026-04-06
 
