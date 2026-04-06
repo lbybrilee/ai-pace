@@ -75,6 +75,30 @@ struct Loc {
         }
     }
 
+    var notificationSound: String {
+        switch lang {
+        case .english: return "Notification Sound"
+        case .spanish: return "Sonido de notificación"
+        case .french: return "Son de notification"
+        case .german: return "Benachrichtigungston"
+        case .japanese: return "通知音"
+        case .korean: return "알림 소리"
+        case .chineseSimplified: return "通知声音"
+        }
+    }
+
+    var menuBarDisplay: String {
+        switch lang {
+        case .english: return "Menu Bar"
+        case .spanish: return "Barra de menús"
+        case .french: return "Barre des menus"
+        case .german: return "Menüleiste"
+        case .japanese: return "メニューバー"
+        case .korean: return "메뉴 막대"
+        case .chineseSimplified: return "菜单栏"
+        }
+    }
+
     var providers: String {
         switch lang {
         case .english: return "Providers"
@@ -150,19 +174,19 @@ struct Loc {
     var autoRefreshDesc: String {
         switch lang {
         case .english:
-            return "Default is 5 minutes. Changing this restarts the background refresh loop immediately."
+            return "Default is 5 minutes. Manual disables background refresh and uses the refresh button only."
         case .spanish:
-            return "El valor predeterminado es 5 minutos. Cambiarlo reinicia el ciclo de actualización en segundo plano de inmediato."
+            return "El valor predeterminado es 5 minutos. Manual desactiva la actualización en segundo plano y usa solo el botón de refrescar."
         case .french:
-            return "La valeur par défaut est de 5 minutes. La modifier redémarre immédiatement l'actualisation en arrière-plan."
+            return "La valeur par défaut est de 5 minutes. Le mode manuel désactive l'actualisation en arrière-plan et utilise seulement le bouton."
         case .german:
-            return "Standard sind 5 Minuten. Eine Änderung startet die Hintergrundaktualisierung sofort neu."
+            return "Standard sind 5 Minuten. Manuell deaktiviert die Hintergrundaktualisierung und nutzt nur den Aktualisieren-Knopf."
         case .japanese:
-            return "デフォルトは5分です。変更するとバックグラウンド更新ループがすぐに再起動します。"
+            return "デフォルトは5分です。手動を選ぶとバックグラウンド更新を止め、更新ボタンのみを使います。"
         case .korean:
-            return "기본값은 5분입니다. 변경 시 즉시 새로고침이 재시작됩니다."
+            return "기본값은 5분입니다. 수동은 백그라운드 새로고침을 끄고 새로고침 버튼만 사용합니다."
         case .chineseSimplified:
-            return "默认值为 5 分钟。更改后会立即重启后台刷新循环。"
+            return "默认值为 5 分钟。手动模式会关闭后台刷新，仅使用刷新按钮。"
         }
     }
 
@@ -232,6 +256,7 @@ struct Loc {
             return interval.label
         case .spanish:
             switch interval {
+            case .manual: return "Manual"
             case .oneMinute: return "1 minuto"
             case .twoMinutes: return "2 minutos"
             case .fiveMinutes: return "5 minutos"
@@ -241,6 +266,7 @@ struct Loc {
             }
         case .french:
             switch interval {
+            case .manual: return "Manuel"
             case .oneMinute: return "1 minute"
             case .twoMinutes: return "2 minutes"
             case .fiveMinutes: return "5 minutes"
@@ -250,6 +276,7 @@ struct Loc {
             }
         case .german:
             switch interval {
+            case .manual: return "Manuell"
             case .oneMinute: return "1 Minute"
             case .twoMinutes: return "2 Minuten"
             case .fiveMinutes: return "5 Minuten"
@@ -259,6 +286,7 @@ struct Loc {
             }
         case .japanese:
             switch interval {
+            case .manual: return "手動"
             case .oneMinute: return "1分"
             case .twoMinutes: return "2分"
             case .fiveMinutes: return "5分"
@@ -268,6 +296,7 @@ struct Loc {
             }
         case .korean:
             switch interval {
+            case .manual: return "수동"
             case .oneMinute: return "1분"
             case .twoMinutes: return "2분"
             case .fiveMinutes: return "5분"
@@ -277,12 +306,50 @@ struct Loc {
             }
         case .chineseSimplified:
             switch interval {
+            case .manual: return "手动"
             case .oneMinute: return "1 分钟"
             case .twoMinutes: return "2 分钟"
             case .fiveMinutes: return "5 分钟"
             case .tenMinutes: return "10 分钟"
             case .fifteenMinutes: return "15 分钟"
             case .thirtyMinutes: return "30 分钟"
+            }
+        }
+    }
+
+    func notificationSoundLabel(_ option: NotificationSoundOption) -> String {
+        switch option {
+        case .systemDefault:
+            switch lang {
+            case .english: return "System Default"
+            case .spanish: return "Predeterminado"
+            case .french: return "Par défaut"
+            case .german: return "Standard"
+            case .japanese: return "システム標準"
+            case .korean: return "시스템 기본값"
+            case .chineseSimplified: return "系统默认"
+            }
+        case .glass:
+            return "Glass"
+        case .hero:
+            return "Hero"
+        case .purr:
+            return "Purr"
+        case .frog:
+            return "Frog"
+        case .bottle:
+            return "Bottle"
+        case .submarine:
+            return "Submarine"
+        case .silent:
+            switch lang {
+            case .english: return "Silent"
+            case .spanish: return "Silencio"
+            case .french: return "Silencieux"
+            case .german: return "Lautlos"
+            case .japanese: return "無音"
+            case .korean: return "무음"
+            case .chineseSimplified: return "静音"
             }
         }
     }
@@ -333,6 +400,31 @@ struct Loc {
             case .japanese: return "\(pct)% 余裕あり"
             case .korean: return "\(pct)% 여유"
             case .chineseSimplified: return "还有 \(pct)% 余量"
+            }
+        }
+    }
+
+    func menuBarDisplayLabel(_ mode: MenuBarDisplayMode) -> String {
+        switch mode {
+        case .usage:
+            switch lang {
+            case .english: return "Usage %"
+            case .spanish: return "Uso %"
+            case .french: return "Utilisation %"
+            case .german: return "Nutzung %"
+            case .japanese: return "使用率 %"
+            case .korean: return "사용률 %"
+            case .chineseSimplified: return "用量 %"
+            }
+        case .insight:
+            switch lang {
+            case .english: return "Insight +/-%"
+            case .spanish: return "Ritmo +/-%"
+            case .french: return "Tendance +/-%"
+            case .german: return "Tendenz +/-%"
+            case .japanese: return "インサイト +/-%"
+            case .korean: return "인사이트 +/-%"
+            case .chineseSimplified: return "洞察 +/-%"
             }
         }
     }

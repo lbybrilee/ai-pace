@@ -5,13 +5,16 @@ import SwiftUI
 
 struct MenuContentView: View {
     @ObservedObject var store: UsageStore
+    let openSettings: () -> Void
+    let popoverHeight: CGFloat
     @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
-    @Environment(\.openWindow) private var openWindow
+    @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
     private var theme: AppTheme { AppTheme.find(selectedThemeID) }
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
     private var loc: Loc { Loc(lang: lang) }
+    private let popoverWidth: CGFloat = 440
 
     var body: some View {
         let visibleSnapshots = store.visibleSnapshots
@@ -33,10 +36,7 @@ struct MenuContentView: View {
             // Provider cards
             VStack(spacing: 8) {
                 if visibleSnapshots.isEmpty {
-                    EmptyAgentsCard(loc: loc, openSettings: {
-                        NSApp.activate(ignoringOtherApps: true)
-                        openWindow(id: "settings")
-                    })
+                    EmptyAgentsCard(loc: loc, openSettings: openSettings)
                 } else {
                     ForEach(visibleSnapshots, id: \.provider.rawValue) { snapshot in
                         ProviderCard(
@@ -48,7 +48,7 @@ struct MenuContentView: View {
                     }
                 }
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 20)
 
             // Footer
             HStack {
@@ -74,8 +74,7 @@ struct MenuContentView: View {
                     }
 
                     footerButton(icon: "gearshape") {
-                        NSApp.activate(ignoringOtherApps: true)
-                        openWindow(id: "settings")
+                        openSettings()
                     }
 
                     footerButton(icon: "arrow.clockwise", dimmed: store.isRefreshing) {
@@ -88,7 +87,11 @@ struct MenuContentView: View {
             .padding(.top, 10)
             .padding(.bottom, 14)
         }
-        .frame(width: 440)
+        .frame(width: popoverWidth)
+        .frame(height: popoverHeight, alignment: .top)
+        .transaction { transaction in
+            transaction.animation = nil
+        }
     }
 
     private func accent(for provider: ProviderKind) -> Color {
@@ -109,6 +112,7 @@ struct MenuContentView: View {
                 .foregroundStyle(dimmed ? .tertiary : .secondary)
         }
         .buttonStyle(.plain)
+        .pointerOnHover()
     }
 
     private func footerMenu<Content: View>(icon: String, @ViewBuilder content: @escaping () -> Content) -> some View {
@@ -120,6 +124,7 @@ struct MenuContentView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
+        .pointerOnHover()
     }
 }
 
@@ -138,6 +143,7 @@ private struct EmptyAgentsCard: View {
             Button(loc.openSettings, action: openSettings)
                 .buttonStyle(.bordered)
                 .controlSize(.small)
+                .pointerOnHover()
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
@@ -206,16 +212,9 @@ private struct WeeklyPacingInsight {
     let color: Color
 
     init?(window: UsageWindow, lang: AppLanguage, now: Date = .now) {
-        guard window.kind == .weekly,
-              let used = window.usedPercentage,
-              let resetsAt = window.resetsAt else {
+        guard let delta = WeeklyPacing.delta(for: window, now: now) else {
             return nil
         }
-
-        let totalWeeklyWindow: TimeInterval = 7 * 24 * 60 * 60
-        let timeRemaining = min(max(resetsAt.timeIntervalSince(now) / totalWeeklyWindow * 100, 0), 100)
-        let usageRemaining = min(max(100 - used, 0), 100)
-        let delta = usageRemaining - timeRemaining
 
         message = Loc(lang: lang).insightMessage(delta: delta)
 
@@ -239,6 +238,7 @@ private struct UsageRow: View {
     private var key: UsageWindowKey { UsageWindowKey(provider: provider, kind: window.kind) }
     private var notifyEnabled: Bool { store.refreshNotificationsEnabled(for: key) }
     private var loc: Loc { Loc(lang: lang) }
+    private let barLeadingInset: CGFloat = 30
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -250,10 +250,14 @@ private struct UsageRow: View {
                     Image(systemName: notifyEnabled ? "bell.fill" : "bell")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(notifyEnabled ? .primary : .tertiary)
+                        .symbolRenderingMode(.hierarchical)
+                        .frame(width: 16, height: 16)
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .pointerOnHover()
+                .padding(.leading, 4)
 
                 Text(loc.windowLabel(window.kind))
                     .font(.system(size: 14, weight: .medium))
@@ -285,6 +289,7 @@ private struct UsageRow: View {
 
             // Bottom tier: full-width bar
             UsageBar(percentage: window.usedPercentage, accent: accent)
+                .padding(.leading, barLeadingInset)
         }
     }
 
@@ -353,6 +358,7 @@ private struct UsageBar: View {
 struct SettingsView: View {
     @ObservedObject var store: UsageStore
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
+    @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
     private var loc: Loc { Loc(lang: lang) }
@@ -394,6 +400,19 @@ struct SettingsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.leading, 136)
                 }
+
+                Divider()
+
+                settingRow(loc.menuBarDisplay) {
+                    Picker("", selection: $menuBarDisplayModeID) {
+                        ForEach(MenuBarDisplayMode.allCases) { mode in
+                            Text(loc.menuBarDisplayLabel(mode)).tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
             }
 
             settingsCard(title: loc.agents) {
@@ -405,10 +424,39 @@ struct SettingsView: View {
             }
 
             settingsCard(title: loc.notifications) {
-                Text(loc.notificationsDesc)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 8) {
+                    settingRow(loc.notificationSound) {
+                        HStack(spacing: 8) {
+                            Picker("", selection: Binding(
+                                get: { store.notificationSound },
+                                set: { store.setNotificationSound($0) }
+                            )) {
+                                ForEach(NotificationSoundOption.allCases) { option in
+                                    Text(loc.notificationSoundLabel(option)).tag(option)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                            .frame(width: 140)
+
+                            Button {
+                                store.previewNotificationSound()
+                            } label: {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .frame(width: 24, height: 24)
+                            }
+                            .buttonStyle(.borderless)
+                            .pointerOnHover()
+                        }
+                    }
+
+                    Text(loc.notificationsDesc)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 136)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -443,6 +491,24 @@ struct SettingsView: View {
             Spacer(minLength: 20)
             control()
         }
+    }
+}
+
+private struct PointerOnHoverModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.onHover { inside in
+            if inside {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+}
+
+private extension View {
+    func pointerOnHover() -> some View {
+        modifier(PointerOnHoverModifier())
     }
 }
 

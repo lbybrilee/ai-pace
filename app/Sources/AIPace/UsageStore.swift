@@ -1,6 +1,13 @@
 import Foundation
 import SwiftUI
 
+protocol ProviderSnapshotFetching: Sendable {
+    func fetch() async -> ProviderSnapshot
+}
+
+extension ClaudeProbe: ProviderSnapshotFetching {}
+extension CodexProbe: ProviderSnapshotFetching {}
+
 @MainActor
 final class UsageStore: ObservableObject {
     @Published var claude = ProviderSnapshot.loading(.claude)
@@ -9,19 +16,37 @@ final class UsageStore: ObservableObject {
     @Published var isRefreshing = false
     @Published private(set) var refreshNotificationKeys: Set<String>
     @Published var autoRefreshInterval: AutoRefreshInterval
+    @Published var notificationSound: NotificationSoundOption
 
-    private let claudeProbe = ClaudeProbe()
-    private let codexProbe = CodexProbe()
-    private let notificationManager = NotificationManager()
+    private let claudeProbe: any ProviderSnapshotFetching
+    private let codexProbe: any ProviderSnapshotFetching
+    private let notificationManager: any NotificationManaging
+    private let userDefaults: UserDefaults
     private var refreshTask: Task<Void, Never>?
     private let refreshNotificationDefaultsKey = "refreshNotificationKeys"
     private let autoRefreshIntervalDefaultsKey = "autoRefreshInterval"
+    private let notificationSoundDefaultsKey = "notificationSound"
 
-    init() {
-        refreshNotificationKeys = Set(UserDefaults.standard.stringArray(forKey: refreshNotificationDefaultsKey) ?? [])
-        let storedInterval = UserDefaults.standard.integer(forKey: autoRefreshIntervalDefaultsKey)
+    init(
+        claudeProbe: any ProviderSnapshotFetching = ClaudeProbe(),
+        codexProbe: any ProviderSnapshotFetching = CodexProbe(),
+        notificationManager: any NotificationManaging = NotificationManager(),
+        userDefaults: UserDefaults = .standard,
+        startRefreshLoop: Bool = true
+    ) {
+        self.claudeProbe = claudeProbe
+        self.codexProbe = codexProbe
+        self.notificationManager = notificationManager
+        self.userDefaults = userDefaults
+        refreshNotificationKeys = Set(userDefaults.stringArray(forKey: refreshNotificationDefaultsKey) ?? [])
+        let storedInterval = userDefaults.integer(forKey: autoRefreshIntervalDefaultsKey)
         autoRefreshInterval = AutoRefreshInterval(rawValue: storedInterval) ?? .defaultValue
-        startRefreshLoop()
+        notificationSound = NotificationSoundOption(
+            rawValue: userDefaults.string(forKey: notificationSoundDefaultsKey) ?? NotificationSoundOption.systemDefault.rawValue
+        ) ?? .systemDefault
+        if startRefreshLoop {
+            self.startRefreshLoop()
+        }
     }
 
     deinit {
@@ -54,12 +79,15 @@ final class UsageStore: ObservableObject {
         let newClaude = await claudeSnapshot
         let newCodex = await codexSnapshot
 
-        claude = newClaude
-        codex = newCodex
+        let resolvedClaude = mergedSnapshot(previous: previousClaude, current: newClaude)
+        let resolvedCodex = mergedSnapshot(previous: previousCodex, current: newCodex)
+
+        claude = resolvedClaude
+        codex = resolvedCodex
         lastUpdated = Date()
 
-        notifyIfWindowRefreshed(previous: previousClaude, current: newClaude)
-        notifyIfWindowRefreshed(previous: previousCodex, current: newCodex)
+        await notifyIfWindowRefreshed(previous: previousClaude, current: resolvedClaude)
+        await notifyIfWindowRefreshed(previous: previousCodex, current: resolvedCodex)
     }
 
     func setAutoRefreshInterval(_ interval: AutoRefreshInterval) {
@@ -67,8 +95,20 @@ final class UsageStore: ObservableObject {
             return
         }
         autoRefreshInterval = interval
-        UserDefaults.standard.set(interval.rawValue, forKey: autoRefreshIntervalDefaultsKey)
+        userDefaults.set(interval.rawValue, forKey: autoRefreshIntervalDefaultsKey)
         startRefreshLoop()
+    }
+
+    func setNotificationSound(_ option: NotificationSoundOption) {
+        guard notificationSound != option else {
+            return
+        }
+        notificationSound = option
+        userDefaults.set(option.rawValue, forKey: notificationSoundDefaultsKey)
+    }
+
+    func previewNotificationSound() {
+        notificationManager.preview(sound: notificationSound)
     }
 
     private func compactValue(for window: UsageWindow) -> String {
@@ -119,23 +159,23 @@ final class UsageStore: ObservableObject {
     }
 
     private func persistRefreshNotificationKeys() {
-        UserDefaults.standard.set(Array(refreshNotificationKeys).sorted(), forKey: refreshNotificationDefaultsKey)
+        userDefaults.set(Array(refreshNotificationKeys).sorted(), forKey: refreshNotificationDefaultsKey)
     }
 
-    private func notifyIfWindowRefreshed(previous: ProviderSnapshot, current: ProviderSnapshot) {
-        notifyIfWindowRefreshed(
+    private func notifyIfWindowRefreshed(previous: ProviderSnapshot, current: ProviderSnapshot) async {
+        await notifyIfWindowRefreshed(
             key: UsageWindowKey(provider: current.provider, kind: .fiveHour),
             previous: previous.fiveHour,
             current: current.fiveHour
         )
-        notifyIfWindowRefreshed(
+        await notifyIfWindowRefreshed(
             key: UsageWindowKey(provider: current.provider, kind: .weekly),
             previous: previous.weekly,
             current: current.weekly
         )
     }
 
-    private func notifyIfWindowRefreshed(key: UsageWindowKey, previous: UsageWindow, current: UsageWindow) {
+    private func notifyIfWindowRefreshed(key: UsageWindowKey, previous: UsageWindow, current: UsageWindow) async {
         guard refreshNotificationsEnabled(for: key) else {
             return
         }
@@ -146,9 +186,7 @@ final class UsageStore: ObservableObject {
             return
         }
 
-        Task {
-            await notificationManager.sendRefreshNotification(for: key)
-        }
+        await notificationManager.sendRefreshNotification(for: key, sound: notificationSound)
     }
 
     private func snapshot(for provider: ProviderKind) -> ProviderSnapshot {
@@ -158,6 +196,28 @@ final class UsageStore: ObservableObject {
         case .codex:
             return codex
         }
+    }
+
+    private func mergedSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> ProviderSnapshot {
+        guard shouldPreservePreviousSnapshot(previous: previous, current: current) else {
+            return current
+        }
+        return previous
+    }
+
+    private func shouldPreservePreviousSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> Bool {
+        let hasCurrentData = current.fiveHour.usedPercentage != nil || current.weekly.usedPercentage != nil
+        guard !hasCurrentData else {
+            return false
+        }
+
+        let hadPreviousData = previous.fiveHour.usedPercentage != nil || previous.weekly.usedPercentage != nil
+        guard hadPreviousData else {
+            return false
+        }
+
+        let message = (current.fiveHour.message ?? current.weekly.message ?? "").lowercased()
+        return message.contains("http 429") || message.contains("rate limit")
     }
 
     private func classifyClaudeStatus(message: String) -> AgentStatus {
@@ -196,6 +256,9 @@ final class UsageStore: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task {
             await refresh()
+            guard autoRefreshInterval != .manual else {
+                return
+            }
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(autoRefreshInterval.duration))
                 guard !Task.isCancelled else {
