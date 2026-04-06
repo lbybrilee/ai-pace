@@ -151,13 +151,46 @@ struct UsageStoreTests {
 
         await store.setRefreshNotificationsEnabled(true, for: key)
         #expect(notificationManager.authorizationRequests == 1)
+        #expect(store.refreshNotificationsEnabled(for: key))
         #expect(defaults.stringArray(forKey: "refreshNotificationKeys") == [key.storageKey])
 
         notificationManager.authorizationGranted = false
         await store.setRefreshNotificationsEnabled(false, for: key)
+        #expect(!store.refreshNotificationsEnabled(for: key))
         #expect(defaults.stringArray(forKey: "refreshNotificationKeys") == [])
 
         await store.setRefreshNotificationsEnabled(true, for: key)
+        #expect(!store.refreshNotificationsEnabled(for: key))
+        #expect(defaults.stringArray(forKey: "refreshNotificationKeys") == [])
+    }
+
+    @Test
+    @MainActor
+    func refreshNotificationAuthorizationStateClearsEnabledKeysWhenSystemNotificationsAreDisabled() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let key = UsageWindowKey(provider: .claude, kind: .weekly)
+        defaults.set([key.storageKey], forKey: "refreshNotificationKeys")
+
+        let notificationManager = NotificationManagerSpy()
+        notificationManager.systemNotificationsDisabled = true
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
+            codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            notificationManager: notificationManager,
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        #expect(store.refreshNotificationsEnabled(for: key))
+
+        await store.refreshNotificationAuthorizationState()
+
+        #expect(store.notificationsDisabledInSystem)
+        #expect(!store.refreshNotificationsEnabled(for: key))
         #expect(defaults.stringArray(forKey: "refreshNotificationKeys") == [])
     }
 

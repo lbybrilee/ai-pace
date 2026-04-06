@@ -112,6 +112,13 @@ if [[ -n "${SIGN_IDENTITY}" ]]; then
     "${APP_BUNDLE}"
 
   codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
+else
+  echo "Ad hoc signing app bundle"
+  codesign \
+    --force \
+    --deep \
+    --sign - \
+    "${APP_BUNDLE}"
 fi
 
 mkdir -p "${STAGING_DIR}"

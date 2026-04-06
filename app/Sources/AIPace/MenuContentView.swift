@@ -98,6 +98,9 @@ struct MenuContentView: View {
         .transaction { transaction in
             transaction.animation = nil
         }
+        .task {
+            await store.refreshNotificationAuthorizationState()
+        }
     }
 
     private func accent(for provider: ProviderKind) -> Color {
@@ -243,6 +246,7 @@ private struct UsageRow: View {
 
     private var key: UsageWindowKey { UsageWindowKey(provider: provider, kind: window.kind) }
     private var notifyEnabled: Bool { store.refreshNotificationsEnabled(for: key) }
+    private var notificationsDisabledInSystem: Bool { store.notificationsDisabledInSystem }
     private var loc: Loc { Loc(lang: lang) }
     private let barLeadingInset: CGFloat = 30
 
@@ -251,17 +255,21 @@ private struct UsageRow: View {
             // Top tier: stats
             HStack(spacing: 6) {
                 Button {
+                    guard !notificationsDisabledInSystem else {
+                        return
+                    }
                     Task { await store.setRefreshNotificationsEnabled(!notifyEnabled, for: key) }
                 } label: {
-                    Image(systemName: notifyEnabled ? "bell.fill" : "bell")
+                    Image(systemName: notificationsDisabledInSystem ? "bell.slash" : (notifyEnabled ? "bell.fill" : "bell"))
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(notifyEnabled ? .primary : .tertiary)
+                        .foregroundStyle(notificationsDisabledInSystem ? .tertiary : (notifyEnabled ? .primary : .tertiary))
                         .symbolRenderingMode(.hierarchical)
                         .frame(width: 16, height: 16)
                         .frame(width: 20, height: 20)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(notificationsDisabledInSystem)
                 .pointerOnHover()
                 .padding(.leading, 4)
 
@@ -435,6 +443,21 @@ struct SettingsView: View {
 
             settingsCard(title: loc.notifications) {
                 VStack(alignment: .leading, spacing: 8) {
+                    if store.notificationsDisabledInSystem {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.orange)
+                                .padding(.top, 2)
+
+                            Text(loc.notificationsDisabledWarning)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.leading, 136)
+                    }
+
                     settingRow(loc.notificationSound) {
                         HStack(spacing: 8) {
                             Picker("", selection: Binding(
@@ -511,6 +534,9 @@ struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
         .frame(width: 500)
+        .task {
+            await store.refreshNotificationAuthorizationState()
+        }
     }
 
     private func settingsCard<Content: View>(title: String? = nil, @ViewBuilder content: () -> Content) -> some View {

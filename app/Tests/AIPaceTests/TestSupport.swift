@@ -97,10 +97,15 @@ func waitUntil(
 @MainActor
 final class NotificationManagerSpy: NotificationManaging {
     var authorizationGranted = true
+    var systemNotificationsDisabled = false
     private(set) var authorizationRequests = 0
     private(set) var sentKeys: [UsageWindowKey] = []
     private(set) var sentSounds: [NotificationSoundOption] = []
     private(set) var previewedSounds: [NotificationSoundOption] = []
+
+    func notificationsDisabledInSystem() async -> Bool {
+        systemNotificationsDisabled
+    }
 
     func requestAuthorizationIfNeeded() async -> Bool {
         authorizationRequests += 1

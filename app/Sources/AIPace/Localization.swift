@@ -269,6 +269,25 @@ struct Loc {
         }
     }
 
+    var notificationsDisabledWarning: String {
+        switch lang {
+        case .english:
+            return "Notifications are turned off for AIPace in System Settings. Bell alerts were disabled and will not fire until you re-enable notifications for the app."
+        case .spanish:
+            return "Las notificaciones están desactivadas para AIPace en Ajustes del sistema. Las alertas de campana se desactivaron y no funcionarán hasta que vuelvas a activar las notificaciones para la app."
+        case .french:
+            return "Les notifications sont désactivées pour AIPace dans les Réglages système. Les alertes de cloche ont été désactivées et ne fonctionneront pas tant que vous n’aurez pas réactivé les notifications pour l’app."
+        case .german:
+            return "Benachrichtigungen sind für AIPace in den Systemeinstellungen deaktiviert. Die Glockenalarme wurden ausgeschaltet und funktionieren erst wieder, wenn du Benachrichtigungen für die App erneut aktivierst."
+        case .japanese:
+            return "AIPace の通知はシステム設定でオフになっています。ベル通知は自動的に無効化され、アプリの通知を再度有効にするまで動作しません。"
+        case .korean:
+            return "시스템 설정에서 AIPace 알림이 꺼져 있습니다. 종 알림은 자동으로 비활성화되며, 앱 알림을 다시 켜기 전까지 동작하지 않습니다."
+        case .chineseSimplified:
+            return "AIPace 的通知已在系统设置中关闭。铃铛提醒已自动关闭，在重新为该应用开启通知前不会生效。"
+        }
+    }
+
     var colorsDesc: String {
         switch lang {
         case .english:
