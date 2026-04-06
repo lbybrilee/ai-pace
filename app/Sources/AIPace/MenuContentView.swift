@@ -398,6 +398,25 @@ struct SettingsView: View {
                 Divider()
 
                 VStack(alignment: .leading, spacing: 8) {
+                    settingRow(loc.launchAtStartup) {
+                        Toggle(
+                            "",
+                            isOn: Binding(
+                                get: { store.launchAtStartupEnabled },
+                                set: { store.setLaunchAtStartupEnabled($0) }
+                            )
+                        )
+                        .labelsHidden()
+                    }
+
+                    Text(launchAtStartupDescription)
+                        .font(.system(size: 11))
+                        .foregroundStyle(launchAtStartupDescriptionColor)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 136)
+
+                    Divider()
+
                     settingRow(loc.autoRefresh) {
                         Picker("", selection: Binding(
                             get: { store.autoRefreshInterval },
@@ -566,6 +585,26 @@ struct SettingsView: View {
             Spacer(minLength: 20)
             control()
         }
+    }
+
+    private var launchAtStartupDescription: String {
+        if let error = store.launchAtStartupErrorMessage {
+            return error
+        }
+        if store.launchAtStartupNeedsApproval {
+            return loc.launchAtStartupApprovalDesc
+        }
+        if !store.launchAtStartupSupported {
+            return loc.launchAtStartupUnsupportedDesc
+        }
+        return loc.launchAtStartupDesc
+    }
+
+    private var launchAtStartupDescriptionColor: Color {
+        if store.launchAtStartupErrorMessage != nil {
+            return .orange
+        }
+        return .secondary
     }
 }
 

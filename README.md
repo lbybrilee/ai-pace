@@ -91,10 +91,16 @@ If you want a DMG, build it yourself from this repo:
 
 ```bash
 cd /path/to/ai-pace
-./scripts/build-dmg.sh --version 1.0.0
+./scripts/build-dmg.sh
 ```
 
-This creates a DMG in the `dist/` folder. Open that DMG and install the app the same way you would other Mac apps: drag `AIPace` into `Applications`.
+This creates a DMG in the `dist/` folder using the current app version from `Info.plist`. Open that DMG and install the app the same way you would other Mac apps: drag `AIPace` into `Applications`.
+
+If you need to override the stamped version for a specific build, pass `--version` explicitly:
+
+```bash
+./scripts/build-dmg.sh --version 1.0.1
+```
 
 ### Option 2: Run From Terminal
 

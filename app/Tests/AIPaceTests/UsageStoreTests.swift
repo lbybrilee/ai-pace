@@ -318,4 +318,67 @@ struct UsageStoreTests {
         #expect(defaults.string(forKey: "notificationSound") == NotificationSoundOption.frog.rawValue)
         #expect(notificationManager.previewedSounds == [.frog])
     }
+
+    @Test
+    @MainActor
+    func launchAtStartupReflectsManagerStateAndUpdatesOnToggle() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let launchManager = LaunchAtStartupManagerSpy()
+        launchManager.state = .requiresApproval
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
+            codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            notificationManager: NotificationManagerSpy(),
+            launchAtStartupManager: launchManager,
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        #expect(store.launchAtStartupEnabled)
+        #expect(store.launchAtStartupNeedsApproval)
+        #expect(store.launchAtStartupSupported)
+
+        store.setLaunchAtStartupEnabled(false)
+
+        #expect(launchManager.setCalls == [false])
+        #expect(store.launchAtStartupState == .disabled)
+        #expect(!store.launchAtStartupEnabled)
+        #expect(store.launchAtStartupErrorMessage == nil)
+    }
+
+    @Test
+    @MainActor
+    func launchAtStartupKeepsStateAndExposesErrorWhenUpdateFails() {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        struct LaunchError: LocalizedError {
+            var errorDescription: String? { "Operation not permitted" }
+        }
+
+        let launchManager = LaunchAtStartupManagerSpy()
+        launchManager.state = .unsupported
+        launchManager.failure = LaunchError()
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
+            codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            notificationManager: NotificationManagerSpy(),
+            launchAtStartupManager: launchManager,
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        store.setLaunchAtStartupEnabled(true)
+
+        #expect(launchManager.setCalls == [true])
+        #expect(store.launchAtStartupState == .unsupported)
+        #expect(!store.launchAtStartupSupported)
+        #expect(store.launchAtStartupErrorMessage == "Operation not permitted")
+    }
 }

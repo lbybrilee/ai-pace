@@ -121,3 +121,23 @@ final class NotificationManagerSpy: NotificationManaging {
         previewedSounds.append(sound)
     }
 }
+
+@MainActor
+final class LaunchAtStartupManagerSpy: LaunchAtStartupManaging {
+    var state: LaunchAtStartupState = .disabled
+    var failure: Error?
+    private(set) var setCalls: [Bool] = []
+
+    func currentState() -> LaunchAtStartupState {
+        state
+    }
+
+    func setEnabled(_ enabled: Bool) throws -> LaunchAtStartupState {
+        setCalls.append(enabled)
+        if let failure {
+            throw failure
+        }
+        state = enabled ? .enabled : .disabled
+        return state
+    }
+}

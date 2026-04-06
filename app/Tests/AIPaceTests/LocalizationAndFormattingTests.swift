@@ -13,6 +13,7 @@ struct LocalizationAndFormattingTests {
         #expect(korean.colors == "색상")
         #expect(korean.reset == "재설정")
         #expect(korean.claudeColor == "Claude 색상")
+        #expect(korean.launchAtStartup == "시동 시 실행")
     }
 
     @Test

@@ -82,6 +82,14 @@ DMG_PATH="${DIST_DIR}/${APP_NAME}-${VERSION}.dmg"
 echo "Building ${APP_NAME} ${VERSION}"
 mkdir -p "${DIST_DIR}"
 
+if [[ -d "${APP_DIR}/.build" ]]; then
+  find "${APP_DIR}/.build" \
+    \( -name 'ModuleCache' -o -name 'ModuleCache.noindex' \) \
+    -type d \
+    -prune \
+    -exec rm -rf {} +
+fi
+
 (
   cd "${APP_DIR}"
   swift build -c release

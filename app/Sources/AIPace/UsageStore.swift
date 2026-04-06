@@ -18,10 +18,13 @@ final class UsageStore: ObservableObject {
     @Published var autoRefreshInterval: AutoRefreshInterval
     @Published var notificationSound: NotificationSoundOption
     @Published private(set) var notificationsDisabledInSystem = false
+    @Published private(set) var launchAtStartupState: LaunchAtStartupState
+    @Published private(set) var launchAtStartupErrorMessage: String?
 
     private let claudeProbe: any ProviderSnapshotFetching
     private let codexProbe: any ProviderSnapshotFetching
     private let notificationManager: any NotificationManaging
+    private let launchAtStartupManager: any LaunchAtStartupManaging
     private let userDefaults: UserDefaults
     private var refreshTask: Task<Void, Never>?
     private var preservedFailureCounts: [ProviderKind: Int] = [:]
@@ -33,12 +36,14 @@ final class UsageStore: ObservableObject {
         claudeProbe: any ProviderSnapshotFetching = ClaudeProbe(),
         codexProbe: any ProviderSnapshotFetching = CodexProbe(),
         notificationManager: any NotificationManaging = NotificationManager(),
+        launchAtStartupManager: any LaunchAtStartupManaging = LaunchAtStartupManager(),
         userDefaults: UserDefaults = .standard,
         startRefreshLoop: Bool = true
     ) {
         self.claudeProbe = claudeProbe
         self.codexProbe = codexProbe
         self.notificationManager = notificationManager
+        self.launchAtStartupManager = launchAtStartupManager
         self.userDefaults = userDefaults
         refreshNotificationKeys = Set(userDefaults.stringArray(forKey: refreshNotificationDefaultsKey) ?? [])
         let storedInterval = userDefaults.integer(forKey: autoRefreshIntervalDefaultsKey)
@@ -46,6 +51,8 @@ final class UsageStore: ObservableObject {
         notificationSound = NotificationSoundOption(
             rawValue: userDefaults.string(forKey: notificationSoundDefaultsKey) ?? NotificationSoundOption.systemDefault.rawValue
         ) ?? .systemDefault
+        launchAtStartupState = launchAtStartupManager.currentState()
+        launchAtStartupErrorMessage = nil
         if startRefreshLoop {
             self.startRefreshLoop()
         }
@@ -111,6 +118,33 @@ final class UsageStore: ObservableObject {
 
     func previewNotificationSound() {
         notificationManager.preview(sound: notificationSound)
+    }
+
+    var launchAtStartupEnabled: Bool {
+        switch launchAtStartupState {
+        case .enabled, .requiresApproval:
+            return true
+        case .disabled, .unsupported:
+            return false
+        }
+    }
+
+    var launchAtStartupNeedsApproval: Bool {
+        launchAtStartupState == .requiresApproval
+    }
+
+    var launchAtStartupSupported: Bool {
+        launchAtStartupState != .unsupported
+    }
+
+    func setLaunchAtStartupEnabled(_ enabled: Bool) {
+        do {
+            launchAtStartupState = try launchAtStartupManager.setEnabled(enabled)
+            launchAtStartupErrorMessage = nil
+        } catch {
+            launchAtStartupState = launchAtStartupManager.currentState()
+            launchAtStartupErrorMessage = error.localizedDescription
+        }
     }
 
     private func compactValue(for window: UsageWindow) -> String {

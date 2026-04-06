@@ -123,6 +123,18 @@ struct Loc {
         }
     }
 
+    var launchAtStartup: String {
+        switch lang {
+        case .english: return "Launch at Startup"
+        case .spanish: return "Iniciar al arrancar"
+        case .french: return "Lancer au demarrage"
+        case .german: return "Beim Start starten"
+        case .japanese: return "起動時に開始"
+        case .korean: return "시동 시 실행"
+        case .chineseSimplified: return "开机时启动"
+        }
+    }
+
     var notifications: String {
         switch lang {
         case .english: return "Notifications"
@@ -247,6 +259,63 @@ struct Loc {
             return "기본값은 5분입니다. 수동은 백그라운드 새로고침을 끄고 새로고침 버튼만 사용합니다."
         case .chineseSimplified:
             return "默认值为 5 分钟。手动模式会关闭后台刷新，仅使用刷新按钮。"
+        }
+    }
+
+    var launchAtStartupDesc: String {
+        switch lang {
+        case .english:
+            return "Start AIPace automatically when you log in to your Mac."
+        case .spanish:
+            return "Inicia AIPace automaticamente cuando inicias sesion en tu Mac."
+        case .french:
+            return "Lance AIPace automatiquement lorsque vous ouvrez une session sur votre Mac."
+        case .german:
+            return "Startet AIPace automatisch, wenn du dich an deinem Mac anmeldest."
+        case .japanese:
+            return "Mac にログインしたときに AIPace を自動で起動します。"
+        case .korean:
+            return "Mac에 로그인할 때 AIPace를 자동으로 실행합니다."
+        case .chineseSimplified:
+            return "登录 Mac 时自动启动 AIPace。"
+        }
+    }
+
+    var launchAtStartupApprovalDesc: String {
+        switch lang {
+        case .english:
+            return "AIPace is added to Login Items, but macOS still requires approval in System Settings."
+        case .spanish:
+            return "AIPace se agrego a los elementos de inicio, pero macOS todavia requiere aprobacion en Ajustes del sistema."
+        case .french:
+            return "AIPace a ete ajoute aux elements d'ouverture, mais macOS demande encore une approbation dans les reglages systeme."
+        case .german:
+            return "AIPace wurde zu den Anmeldeobjekten hinzugefugt, aber macOS braucht noch eine Freigabe in den Systemeinstellungen."
+        case .japanese:
+            return "AIPace はログイン項目に追加されましたが、macOS のシステム設定でまだ承認が必要です。"
+        case .korean:
+            return "AIPace가 로그인 항목에 추가되었지만, macOS 시스템 설정에서 아직 승인이 필요합니다."
+        case .chineseSimplified:
+            return "AIPace 已添加到登录项，但 macOS 仍需要你在系统设置中批准。"
+        }
+    }
+
+    var launchAtStartupUnsupportedDesc: String {
+        switch lang {
+        case .english:
+            return "Launch at startup is available only from the packaged app."
+        case .spanish:
+            return "Esta opcion solo esta disponible desde la app empaquetada."
+        case .french:
+            return "Cette option est disponible uniquement depuis l'application empaquetee."
+        case .german:
+            return "Diese Option ist nur in der gebundelten App verfugbar."
+        case .japanese:
+            return "このオプションはパッケージ化されたアプリでのみ利用できます。"
+        case .korean:
+            return "이 옵션은 패키징된 앱에서만 사용할 수 있습니다."
+        case .chineseSimplified:
+            return "此选项仅在打包后的应用中可用。"
         }
     }
 
