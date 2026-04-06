@@ -22,9 +22,7 @@ struct MenuContentView: View {
         VStack(spacing: 0) {
             // Header
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "flask.fill")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.tertiary)
+                AppLogoView(size: 18)
                 Text(loc.usage)
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()

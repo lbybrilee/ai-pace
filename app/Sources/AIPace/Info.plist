@@ -16,6 +16,8 @@
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>AIPace</string>
+    <key>CFBundleIconFile</key>
+    <string>AIPace</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>

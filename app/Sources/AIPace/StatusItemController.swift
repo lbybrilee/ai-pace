@@ -3,13 +3,15 @@ import Combine
 import SwiftUI
 
 @MainActor
-final class StatusItemController: NSObject, NSMenuDelegate {
+final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
     private let popoverWidth: CGFloat = 440
     private let store: UsageStore
     private let openSettings: @MainActor () -> Void
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
     private var popoverHostingController: NSHostingController<MenuContentView>?
+    private var globalClickMonitor: Any?
+    private var appDeactivationObserver: NSObjectProtocol?
     private var cancellables = Set<AnyCancellable>()
 
     init(store: UsageStore, openSettings: @escaping @MainActor () -> Void) {
@@ -41,6 +43,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func configurePopover() {
         popover.behavior = .semitransient
         popover.animates = false
+        popover.delegate = self
         let size = popoverSize()
         popover.contentSize = size
 
@@ -168,16 +171,17 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         }
 
         if popover.isShown {
-            popover.performClose(nil)
+            closePopover()
             return
         }
 
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        startPopoverDismissMonitoring()
     }
 
     private func showContextMenu() {
-        popover.performClose(nil)
+        closePopover()
 
         let menu = NSMenu()
         menu.delegate = self
@@ -198,11 +202,58 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     func menuDidClose(_ menu: NSMenu) {
     }
 
+    func popoverDidClose(_ notification: Notification) {
+        stopPopoverDismissMonitoring()
+    }
+
     @objc private func openSettingsFromMenu(_ sender: Any?) {
         openSettings()
     }
 
     @objc private func quit(_ sender: Any?) {
         NSApp.terminate(nil)
+    }
+
+    private func closePopover() {
+        guard popover.isShown else {
+            stopPopoverDismissMonitoring()
+            return
+        }
+        popover.performClose(nil)
+        stopPopoverDismissMonitoring()
+    }
+
+    private func startPopoverDismissMonitoring() {
+        if globalClickMonitor == nil {
+            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.closePopover()
+                }
+            }
+        }
+
+        if appDeactivationObserver == nil {
+            appDeactivationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.closePopover()
+                }
+            }
+        }
+    }
+
+    private func stopPopoverDismissMonitoring() {
+        if let globalClickMonitor {
+            NSEvent.removeMonitor(globalClickMonitor)
+            self.globalClickMonitor = nil
+        }
+
+        if let appDeactivationObserver {
+            NotificationCenter.default.removeObserver(appDeactivationObserver)
+            self.appDeactivationObserver = nil
+        }
     }
 }

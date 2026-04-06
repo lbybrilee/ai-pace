@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 APP_DIR="${REPO_ROOT}/app"
 INFO_PLIST="${APP_DIR}/Sources/AIPace/Info.plist"
+ICON_FILE="${APP_DIR}/Resources/AIPace.icns"
 DIST_DIR="${REPO_ROOT}/dist"
 APP_BUNDLE="${DIST_DIR}/${APP_NAME}.app"
 STAGING_DIR="${DIST_DIR}/dmg-staging"
@@ -92,6 +93,9 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
 cp "${APP_DIR}/.build/release/${APP_NAME}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "${INFO_PLIST}" "${APP_BUNDLE}/Contents/Info.plist"
+if [[ -f "${ICON_FILE}" ]]; then
+  cp "${ICON_FILE}" "${APP_BUNDLE}/Contents/Resources/"
+fi
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
