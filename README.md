@@ -120,6 +120,10 @@ Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To report a security issue, see [SECURITY.md](SECURITY.md).
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
