@@ -63,6 +63,45 @@ struct UsageStoreTests {
 
     @Test
     @MainActor
+    func refreshPreservesFirstTransientClaudeAuthFailureOnly() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let previousClaude = makeSnapshot(.claude, fiveHourUsed: 20, weeklyUsed: 70)
+        let claudeQueue = ProbeQueue([
+            makeSnapshot(.claude, fiveHourMessage: "Claude authentication failed.", weeklyMessage: "Claude authentication failed."),
+            makeSnapshot(.claude, fiveHourMessage: "Claude authentication failed.", weeklyMessage: "Claude authentication failed."),
+        ])
+        let codexQueue = ProbeQueue([
+            makeSnapshot(.codex, fiveHourUsed: 11, weeklyUsed: 22),
+            makeSnapshot(.codex, fiveHourUsed: 11, weeklyUsed: 22),
+        ])
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: claudeQueue),
+            codexProbe: ProbeStub(queue: codexQueue),
+            notificationManager: NotificationManagerSpy(),
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+        store.claude = previousClaude
+
+        await store.refresh()
+
+        #expect(store.claude.fiveHour.usedPercentage == 20)
+        #expect(store.claude.weekly.usedPercentage == 70)
+        #expect(store.agentStatus(for: .claude).availability == .available)
+
+        await store.refresh()
+
+        #expect(store.claude.fiveHour.usedPercentage == nil)
+        #expect(store.claude.weekly.usedPercentage == nil)
+        #expect(store.claude.fiveHour.message == "Claude authentication failed.")
+        #expect(store.agentStatus(for: .claude).availability == .sessionExpired)
+    }
+
+    @Test
+    @MainActor
     func refreshSendsNotificationWhenUsageWindowResets() async {
         let suiteName = UUID().uuidString
         let defaults = UserDefaults(suiteName: suiteName)!
