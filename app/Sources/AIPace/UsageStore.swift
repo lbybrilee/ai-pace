@@ -23,6 +23,7 @@ final class UsageStore: ObservableObject {
     private let notificationManager: any NotificationManaging
     private let userDefaults: UserDefaults
     private var refreshTask: Task<Void, Never>?
+    private var preservedFailureCounts: [ProviderKind: Int] = [:]
     private let refreshNotificationDefaultsKey = "refreshNotificationKeys"
     private let autoRefreshIntervalDefaultsKey = "autoRefreshInterval"
     private let notificationSoundDefaultsKey = "notificationSound"
@@ -199,13 +200,23 @@ final class UsageStore: ObservableObject {
     }
 
     private func mergedSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> ProviderSnapshot {
-        guard shouldPreservePreviousSnapshot(previous: previous, current: current) else {
+        guard shouldPreservePreviousSnapshot(
+            previous: previous,
+            current: current,
+            preservedFailureCount: preservedFailureCounts[current.provider, default: 0]
+        ) else {
+            preservedFailureCounts[current.provider] = 0
             return current
         }
+        preservedFailureCounts[current.provider, default: 0] += 1
         return previous
     }
 
-    private func shouldPreservePreviousSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> Bool {
+    private func shouldPreservePreviousSnapshot(
+        previous: ProviderSnapshot,
+        current: ProviderSnapshot,
+        preservedFailureCount: Int
+    ) -> Bool {
         let hasCurrentData = current.fiveHour.usedPercentage != nil || current.weekly.usedPercentage != nil
         guard !hasCurrentData else {
             return false
@@ -217,7 +228,22 @@ final class UsageStore: ObservableObject {
         }
 
         let message = (current.fiveHour.message ?? current.weekly.message ?? "").lowercased()
-        return message.contains("http 429") || message.contains("rate limit")
+        if message.contains("http 429") || message.contains("rate limit") {
+            return true
+        }
+
+        guard current.provider == .claude, preservedFailureCount == 0 else {
+            return false
+        }
+
+        return isTransientClaudeAuthFailure(message)
+    }
+
+    private func isTransientClaudeAuthFailure(_ message: String) -> Bool {
+        message.contains("credentials not found")
+            || message.contains("credentials could not be read")
+            || message.contains("authentication failed")
+            || message.contains("session expired")
     }
 
     private func classifyClaudeStatus(message: String) -> AgentStatus {
