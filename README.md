@@ -23,18 +23,25 @@ AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` u
 ## Screenshots
 
 <p align="center">
-  <img src="docs/images/image.png" alt="AIPace menu bar overview" width="700">
+  <img src="docs/images/image-v4.png" alt="AIPace popover showing Claude and Codex usage" width="700">
 </p>
+<p align="center"><em>Main popover with Claude and Codex usage, pacing, and refresh controls.</em></p>
 
 <p align="center">
-  <img src="docs/images/image-v1.png" alt="AIPace screenshot 1" width="340">
-  <img src="docs/images/image-v2.png" alt="AIPace screenshot 2" width="340">
+  <img src="docs/images/image-v2.png" alt="AIPace options window" width="420">
 </p>
+<p align="center"><em>Options window for language, refresh timing, notifications, and menu bar display.</em></p>
 
 <p align="center">
-  <img src="docs/images/image-v3.png" alt="AIPace screenshot 3" width="340">
-  <img src="docs/images/image-v4.png" alt="AIPace screenshot 4" width="340">
+  <img src="docs/images/image-v3.png" alt="AIPace custom Claude and Codex color settings" width="520">
 </p>
+<p align="center"><em>Custom color settings for Claude and Codex, with theme-based defaults.</em></p>
+
+<p align="center">
+  <img src="docs/images/image.png" alt="AIPace menu bar usage display" width="320">
+  <img src="docs/images/image-v1.png" alt="AIPace menu bar insight display" width="320">
+</p>
+<p align="center"><em>Menu bar display modes: usage percentages and pacing insight.</em></p>
 
 ## What You'll Need
 
@@ -79,7 +86,7 @@ This app depends on local auth state and provider APIs that can change. If you u
 
 ### Option 1: Download The DMG
 
-1. Open the latest release on GitHub
+1. Open the latest release on GitHub: [Releases](https://github.com/lbybrilee/ai-pace/releases)
 2. Download the `.dmg`
 3. Drag `AIPace` into `Applications`
 4. Launch the app and look for the flask icon in your menu bar
