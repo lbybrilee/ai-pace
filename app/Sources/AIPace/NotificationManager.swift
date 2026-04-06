@@ -5,6 +5,7 @@ import UserNotifications
 
 @MainActor
 protocol NotificationManaging: AnyObject {
+    func notificationsDisabledInSystem() async -> Bool
     func requestAuthorizationIfNeeded() async -> Bool
     func sendRefreshNotification(for key: UsageWindowKey, sound: NotificationSoundOption) async
     func preview(sound: NotificationSoundOption)
@@ -27,6 +28,15 @@ final class NotificationManager: NotificationManaging {
 
         let validationStatus = SecStaticCodeCheckValidity(staticCode, [], nil)
         return validationStatus == errSecSuccess
+    }
+
+    func notificationsDisabledInSystem() async -> Bool {
+        guard prefersUserNotifications else {
+            return false
+        }
+
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        return settings.authorizationStatus == .denied
     }
 
     func requestAuthorizationIfNeeded() async -> Bool {

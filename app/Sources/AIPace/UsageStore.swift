@@ -17,6 +17,7 @@ final class UsageStore: ObservableObject {
     @Published private(set) var refreshNotificationKeys: Set<String>
     @Published var autoRefreshInterval: AutoRefreshInterval
     @Published var notificationSound: NotificationSoundOption
+    @Published private(set) var notificationsDisabledInSystem = false
 
     private let claudeProbe: any ProviderSnapshotFetching
     private let codexProbe: any ProviderSnapshotFetching
@@ -123,6 +124,11 @@ final class UsageStore: ObservableObject {
         refreshNotificationKeys.contains(key.storageKey)
     }
 
+    func refreshNotificationAuthorizationState() async {
+        let disabledInSystem = await notificationManager.notificationsDisabledInSystem()
+        applyNotificationAuthorizationState(disabledInSystem: disabledInSystem)
+    }
+
     func agentStatus(for provider: ProviderKind) -> AgentStatus {
         let snapshot = snapshot(for: provider)
         if snapshot.fiveHour.usedPercentage != nil || snapshot.weekly.usedPercentage != nil {
@@ -149,18 +155,34 @@ final class UsageStore: ObservableObject {
     func setRefreshNotificationsEnabled(_ enabled: Bool, for key: UsageWindowKey) async {
         if enabled {
             let granted = await notificationManager.requestAuthorizationIfNeeded()
+            await refreshNotificationAuthorizationState()
             guard granted else {
                 return
             }
-            refreshNotificationKeys.insert(key.storageKey)
+            var updatedKeys = refreshNotificationKeys
+            updatedKeys.insert(key.storageKey)
+            refreshNotificationKeys = updatedKeys
         } else {
-            refreshNotificationKeys.remove(key.storageKey)
+            var updatedKeys = refreshNotificationKeys
+            updatedKeys.remove(key.storageKey)
+            refreshNotificationKeys = updatedKeys
         }
         persistRefreshNotificationKeys()
     }
 
     private func persistRefreshNotificationKeys() {
         userDefaults.set(Array(refreshNotificationKeys).sorted(), forKey: refreshNotificationDefaultsKey)
+    }
+
+    private func applyNotificationAuthorizationState(disabledInSystem: Bool) {
+        notificationsDisabledInSystem = disabledInSystem
+
+        guard disabledInSystem, !refreshNotificationKeys.isEmpty else {
+            return
+        }
+
+        refreshNotificationKeys = []
+        persistRefreshNotificationKeys()
     }
 
     private func notifyIfWindowRefreshed(previous: ProviderSnapshot, current: ProviderSnapshot) async {

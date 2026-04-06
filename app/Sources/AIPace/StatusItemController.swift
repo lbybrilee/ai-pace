@@ -178,6 +178,9 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         startPopoverDismissMonitoring()
+        Task {
+            await store.refreshNotificationAuthorizationState()
+        }
     }
 
     private func showContextMenu() {
@@ -196,10 +199,12 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        statusItem.popUpMenu(menu)
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
     }
 
     func menuDidClose(_ menu: NSMenu) {
+        statusItem.menu = nil
     }
 
     func popoverDidClose(_ notification: Notification) {

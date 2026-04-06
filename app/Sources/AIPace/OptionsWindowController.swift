@@ -6,8 +6,10 @@ final class OptionsWindowController: NSWindowController {
     private let windowWidth: CGFloat = 520
     private let preferredWindowHeight: CGFloat = 640
     private let minimumWindowHeight: CGFloat = 460
+    private let store: UsageStore
 
     init(store: UsageStore) {
+        self.store = store
         let contentView = ScrollView {
             SettingsView(store: store)
         }
@@ -49,6 +51,9 @@ final class OptionsWindowController: NSWindowController {
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        Task {
+            await store.refreshNotificationAuthorizationState()
+        }
     }
 
     private func resolvedWindowHeight() -> CGFloat {
