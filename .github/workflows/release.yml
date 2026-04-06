@@ -19,34 +19,11 @@ jobs:
       - name: Show Swift Version
         run: swift --version
 
-      - name: Build Release Binary
-        working-directory: app
-        run: swift build -c release
-
-      - name: Assemble App Bundle
-        run: |
-          mkdir -p AIPace.app/Contents/MacOS
-          mkdir -p AIPace.app/Contents/Resources
-
-          cp app/.build/release/AIPace AIPace.app/Contents/MacOS/AIPace
-          cp app/Sources/AIPace/Info.plist AIPace.app/Contents/Info.plist
-
-          # Stamp the version from the tag into the plist
-          VERSION="${GITHUB_REF_NAME#v}"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" AIPace.app/Contents/Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" AIPace.app/Contents/Info.plist
-
-          chmod +x AIPace.app/Contents/MacOS/AIPace
-
-      - name: Create DMG
-        run: |
-          mkdir -p dmg-staging
-          cp -R AIPace.app dmg-staging/
-          ln -s /Applications dmg-staging/Applications
-          hdiutil create -volname "AIPace" -srcfolder dmg-staging -ov -format UDZO AIPace.dmg
+      - name: Build DMG
+        run: ./scripts/build-dmg.sh --version "${GITHUB_REF_NAME#v}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: AIPace.dmg
+          files: dist/AIPace-*.dmg
