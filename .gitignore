@@ -8,3 +8,4 @@ DerivedData/
 .netrc
 *.app
 *.dmg
+dist/

@@ -59,8 +59,11 @@ This project works with local auth state and depends on provider APIs and CLI co
 
 ### Option 1: Xcode
 
-1. Open `app/Package.swift` in Xcode
-2. Run the `AIPace` executable target
+1. In Xcode, choose `File -> Open...`
+2. Select `app/Package.swift` (not the repo root)
+3. Run the `AIPace` executable target
+
+This repository is a Swift Package. It does not include an `.xcodeproj` or `.xcworkspace`, so opening the top-level folder will not work the same way as a typical Xcode project.
 
 ### Option 2: Terminal
 
@@ -70,6 +73,55 @@ cd app && swift run
 
 After launch, look for the flask icon in your menu bar.
 
+## Run Tests
+
+Run the unit test suite from the repo root:
+
+```bash
+./scripts/test.sh
+```
+
+The script prefers the full Xcode toolchain when it is installed, which avoids the missing test framework problem some Command Line Tools setups have with plain `swift test`.
+
+## Build a DMG
+
+Build an unsigned DMG locally:
+
+```bash
+./scripts/build-dmg.sh --version 0.1.0
+```
+
+Artifacts are written to `dist/`.
+
+## Sign and Notarize
+
+For distribution outside the Mac App Store, sign the app with a `Developer ID Application` certificate and notarize the DMG with `notarytool`.
+
+1. List your signing identities:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+2. Store notarization credentials in Keychain:
+
+```bash
+xcrun notarytool store-credentials AC_NOTARY \
+  --apple-id "you@example.com" \
+  --team-id TEAMID
+```
+
+3. Build, sign, notarize, and staple the DMG:
+
+```bash
+./scripts/build-dmg.sh \
+  --version 0.1.0 \
+  --sign "Developer ID Application: Your Name (TEAMID)" \
+  --notarize-profile AC_NOTARY
+```
+
+The script signs the `.app` with hardened runtime enabled, submits the `.dmg` to Apple, then staples the notarization ticket to the `.dmg`.
+
 ## Troubleshooting
 
 | Problem | What to try |
@@ -77,13 +129,15 @@ After launch, look for the flask icon in your menu bar.
 | Claude unavailable | Make sure `claude` is installed and logged in, or set `CLAUDE_CODE_OAUTH_TOKEN` |
 | Claude Keychain prompt | Expected if your credentials are stored in Keychain — just approve it |
 | Codex unavailable | Check that the `codex` CLI is installed, on your `PATH`, and logged in |
+| Codex works in Terminal but not from Xcode | Xcode-launched apps often inherit a different `PATH`; AIPace now augments `PATH` with your login shell and common macOS install directories |
 | Usage stuck on loading | Try the refresh button, then relaunch the app so it picks up your current shell environment |
+| Xcode will not open the app | Open `app/Package.swift`, not the repo root, and make sure your Xcode version supports `swift-tools-version: 6.2` |
 
 ## Good to Know
 
 - The app relies on local CLI install paths and auth state
 - `codex app-server` and the Claude OAuth usage flow are external integrations that may change over time
-- Currently ships as source code only — no signed/notarized app releases yet
+- The GitHub release workflow currently builds an unsigned DMG unless you add signing credentials in CI
 
 ## Contributing
 

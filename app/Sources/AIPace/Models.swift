@@ -22,9 +22,9 @@ enum AgentAvailability: Equatable {
 
     var showsInPopover: Bool {
         switch self {
-        case .loading, .available, .error:
+        case .loading, .available:
             return true
-        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn:
+        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn, .error:
             return false
         }
     }
@@ -36,7 +36,15 @@ struct AgentStatus: Equatable {
     let message: String?
 }
 
+enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
+    case usage
+    case insight
+
+    var id: String { rawValue }
+}
+
 enum AutoRefreshInterval: Int, CaseIterable, Identifiable {
+    case manual = 0
     case oneMinute = 60
     case twoMinutes = 120
     case fiveMinutes = 300
@@ -50,6 +58,8 @@ enum AutoRefreshInterval: Int, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
+        case .manual:
+            return "Manual"
         case .oneMinute:
             return "1 minute"
         case .twoMinutes:
@@ -66,6 +76,38 @@ enum AutoRefreshInterval: Int, CaseIterable, Identifiable {
     }
 
     static let defaultValue: AutoRefreshInterval = .fiveMinutes
+}
+
+enum NotificationSoundOption: String, CaseIterable, Identifiable {
+    case systemDefault
+    case glass
+    case hero
+    case purr
+    case frog
+    case bottle
+    case submarine
+    case silent
+
+    var id: String { rawValue }
+
+    var soundName: String? {
+        switch self {
+        case .systemDefault, .silent:
+            return nil
+        case .glass:
+            return "Glass"
+        case .hero:
+            return "Hero"
+        case .purr:
+            return "Purr"
+        case .frog:
+            return "Frog"
+        case .bottle:
+            return "Bottle"
+        case .submarine:
+            return "Submarine"
+        }
+    }
 }
 
 struct UsageWindowKey: Hashable, Sendable {
@@ -103,5 +145,32 @@ struct ProviderSnapshot {
             weekly: .placeholder(.weekly),
             detail: nil
         )
+    }
+}
+
+enum WeeklyPacing {
+    static func delta(for window: UsageWindow, now: Date = .now) -> Double? {
+        guard window.kind == .weekly,
+              let used = window.usedPercentage,
+              let resetsAt = window.resetsAt else {
+            return nil
+        }
+
+        let totalWeeklyWindow: TimeInterval = 7 * 24 * 60 * 60
+        let timeRemaining = min(max(resetsAt.timeIntervalSince(now) / totalWeeklyWindow * 100, 0), 100)
+        let usageRemaining = min(max(100 - used, 0), 100)
+        return usageRemaining - timeRemaining
+    }
+
+    static func formattedDelta(for window: UsageWindow, now: Date = .now) -> String? {
+        guard let delta = delta(for: window, now: now) else {
+            return nil
+        }
+
+        let roundedDelta = delta.rounded()
+        if abs(roundedDelta) < 0.5 {
+            return "0%"
+        }
+        return String(format: "%+.0f%%", roundedDelta)
     }
 }
