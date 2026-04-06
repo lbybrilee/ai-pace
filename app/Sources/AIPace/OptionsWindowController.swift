@@ -3,12 +3,18 @@ import SwiftUI
 
 @MainActor
 final class OptionsWindowController: NSWindowController {
+    private let windowWidth: CGFloat = 520
+    private let preferredWindowHeight: CGFloat = 640
+    private let minimumWindowHeight: CGFloat = 460
+
     init(store: UsageStore) {
-        let contentView = SettingsView(store: store)
+        let contentView = ScrollView {
+            SettingsView(store: store)
+        }
         let hostingController = NSHostingController(rootView: contentView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: preferredWindowHeight),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -16,7 +22,7 @@ final class OptionsWindowController: NSWindowController {
         window.title = "Options"
         window.contentViewController = hostingController
         window.center()
-        window.setContentSize(NSSize(width: 520, height: 320))
+        window.minSize = NSSize(width: windowWidth, height: minimumWindowHeight)
         window.isReleasedWhenClosed = false
 
         super.init(window: window)
@@ -33,6 +39,9 @@ final class OptionsWindowController: NSWindowController {
             return
         }
 
+        let targetHeight = resolvedWindowHeight()
+        window.setContentSize(NSSize(width: windowWidth, height: targetHeight))
+
         if !window.isVisible {
             window.center()
         }
@@ -40,5 +49,14 @@ final class OptionsWindowController: NSWindowController {
         showWindow(nil)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func resolvedWindowHeight() -> CGFloat {
+        guard let visibleFrame = NSScreen.main?.visibleFrame else {
+            return preferredWindowHeight
+        }
+
+        let maxHeight = max(minimumWindowHeight, visibleFrame.height - 120)
+        return min(preferredWindowHeight, maxHeight)
     }
 }

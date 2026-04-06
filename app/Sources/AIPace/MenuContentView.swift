@@ -8,10 +8,18 @@ struct MenuContentView: View {
     let openSettings: () -> Void
     let popoverHeight: CGFloat
     @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
+    @AppStorage(AppTheme.customClaudeAccentDefaultsKey) private var customClaudeAccentHex = ""
+    @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
-    private var theme: AppTheme { AppTheme.find(selectedThemeID) }
+    private var theme: AppTheme {
+        AppTheme.resolvedTheme(
+            themeID: selectedThemeID,
+            customClaudeAccentHex: customClaudeAccentHex,
+            customCodexAccentHex: customCodexAccentHex
+        )
+    }
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
     private var loc: Loc { Loc(lang: lang) }
     private let popoverWidth: CGFloat = 440
@@ -23,7 +31,7 @@ struct MenuContentView: View {
             // Header
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 AppLogoView(size: 18)
-                Text(loc.usage)
+                Text("AIPace")
                     .font(.system(size: 16, weight: .semibold))
                 Spacer()
             }
@@ -355,11 +363,15 @@ private struct UsageBar: View {
 
 struct SettingsView: View {
     @ObservedObject var store: UsageStore
+    @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
+    @AppStorage(AppTheme.customClaudeAccentDefaultsKey) private var customClaudeAccentHex = ""
+    @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
     private var loc: Loc { Loc(lang: lang) }
+    private var baseTheme: AppTheme { AppTheme.find(selectedThemeID) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -456,6 +468,45 @@ struct SettingsView: View {
                         .padding(.leading, 136)
                 }
             }
+
+            settingsCard(title: loc.colors) {
+                settingRow(loc.theme) {
+                    Picker("", selection: $selectedThemeID) {
+                        ForEach(AppTheme.all) { theme in
+                            Text(theme.name).tag(theme.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
+
+                Divider()
+
+                settingRow(loc.claudeColor) {
+                    AccentColorControl(
+                        hexValue: $customClaudeAccentHex,
+                        fallbackColor: baseTheme.claudeAccent,
+                        resetLabel: loc.reset
+                    )
+                }
+
+                Divider()
+
+                settingRow(loc.codexColor) {
+                    AccentColorControl(
+                        hexValue: $customCodexAccentHex,
+                        fallbackColor: baseTheme.codexAccent,
+                        resetLabel: loc.reset
+                    )
+                }
+
+                Text(loc.colorsDesc)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 136)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
@@ -489,6 +540,83 @@ struct SettingsView: View {
             Spacer(minLength: 20)
             control()
         }
+    }
+}
+
+private struct AccentColorControl: View {
+    @Binding var hexValue: String
+    let fallbackColor: Color
+    let resetLabel: String
+
+    @FocusState private var isFocused: Bool
+    @State private var draftHex = ""
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ColorPicker(
+                "",
+                selection: Binding(
+                    get: { AppColorHex.color(from: hexValue) ?? fallbackColor },
+                    set: { newColor in
+                        guard let resolvedHex = AppColorHex.string(from: newColor) else {
+                            return
+                        }
+                        hexValue = resolvedHex
+                        draftHex = resolvedHex
+                    }
+                ),
+                supportsOpacity: false
+            )
+            .labelsHidden()
+            .frame(width: 32)
+
+            TextField("#F26B1D", text: $draftHex)
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 12, design: .monospaced))
+                .frame(width: 96)
+                .focused($isFocused)
+                .onSubmit(commitDraft)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused {
+                        commitDraft()
+                    }
+                }
+                .onChange(of: hexValue) { _, _ in
+                    if !isFocused {
+                        syncDraft()
+                    }
+                }
+
+            Button(resetLabel) {
+                hexValue = ""
+                draftHex = ""
+            }
+            .buttonStyle(.borderless)
+            .disabled(AppColorHex.normalized(hexValue) == nil)
+            .pointerOnHover()
+        }
+        .onAppear(perform: syncDraft)
+    }
+
+    private func commitDraft() {
+        let trimmed = draftHex.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            hexValue = ""
+            draftHex = ""
+            return
+        }
+
+        guard let normalized = AppColorHex.normalized(trimmed) else {
+            syncDraft()
+            return
+        }
+
+        hexValue = normalized
+        draftHex = normalized
+    }
+
+    private func syncDraft() {
+        draftHex = AppColorHex.normalized(hexValue) ?? ""
     }
 }
 

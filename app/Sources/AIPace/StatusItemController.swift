@@ -82,7 +82,7 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
         }
 
         let themeID = UserDefaults.standard.string(forKey: "selectedTheme") ?? AppTheme.defaultTheme.id
-        let theme = AppTheme.find(themeID)
+        let theme = AppTheme.resolvedTheme(themeID: themeID)
         let view = statusLabelView(theme: theme)
         let renderer = ImageRenderer(content: view)
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
@@ -97,8 +97,8 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
     }
 
     private func statusLabelView(theme: AppTheme? = nil) -> StatusItemLabelView {
-        let resolvedTheme = theme ?? AppTheme.find(
-            UserDefaults.standard.string(forKey: "selectedTheme") ?? AppTheme.defaultTheme.id
+        let resolvedTheme = theme ?? AppTheme.resolvedTheme(
+            themeID: UserDefaults.standard.string(forKey: "selectedTheme") ?? AppTheme.defaultTheme.id
         )
         let displayMode = MenuBarDisplayMode(
             rawValue: UserDefaults.standard.string(forKey: "menuBarDisplayMode") ?? MenuBarDisplayMode.usage.rawValue

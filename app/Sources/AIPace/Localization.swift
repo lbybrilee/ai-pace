@@ -51,6 +51,66 @@ struct Loc {
         }
     }
 
+    var colors: String {
+        switch lang {
+        case .english: return "Colors"
+        case .spanish: return "Colores"
+        case .french: return "Couleurs"
+        case .german: return "Farben"
+        case .japanese: return "カラー"
+        case .korean: return "색상"
+        case .chineseSimplified: return "颜色"
+        }
+    }
+
+    var theme: String {
+        switch lang {
+        case .english: return "Theme"
+        case .spanish: return "Tema"
+        case .french: return "Thème"
+        case .german: return "Thema"
+        case .japanese: return "テーマ"
+        case .korean: return "테마"
+        case .chineseSimplified: return "主题"
+        }
+    }
+
+    var claudeColor: String {
+        switch lang {
+        case .english: return "Claude Color"
+        case .spanish: return "Color de Claude"
+        case .french: return "Couleur de Claude"
+        case .german: return "Claude-Farbe"
+        case .japanese: return "Claude の色"
+        case .korean: return "Claude 색상"
+        case .chineseSimplified: return "Claude 颜色"
+        }
+    }
+
+    var codexColor: String {
+        switch lang {
+        case .english: return "Codex Color"
+        case .spanish: return "Color de Codex"
+        case .french: return "Couleur de Codex"
+        case .german: return "Codex-Farbe"
+        case .japanese: return "Codex の色"
+        case .korean: return "Codex 색상"
+        case .chineseSimplified: return "Codex 颜色"
+        }
+    }
+
+    var reset: String {
+        switch lang {
+        case .english: return "Reset"
+        case .spanish: return "Restablecer"
+        case .french: return "Réinitialiser"
+        case .german: return "Zurücksetzen"
+        case .japanese: return "リセット"
+        case .korean: return "재설정"
+        case .chineseSimplified: return "重置"
+        }
+    }
+
     var autoRefresh: String {
         switch lang {
         case .english: return "Auto Refresh"
@@ -206,6 +266,25 @@ struct Loc {
             return "종 아이콘을 탭하면 사용량 갱신 시 알림을 받을 수 있습니다."
         case .chineseSimplified:
             return "点击任一行的铃铛图标，即可在该用量窗口重置时收到通知。"
+        }
+    }
+
+    var colorsDesc: String {
+        switch lang {
+        case .english:
+            return "Pick a color or enter a hex value like #F26B1D. Reset returns that provider to the current theme color."
+        case .spanish:
+            return "Elige un color o escribe un valor hex como #F26B1D. Restablecer devuelve ese servicio al color del tema actual."
+        case .french:
+            return "Choisissez une couleur ou saisissez une valeur hexadécimale comme #F26B1D. Réinitialiser rétablit la couleur du thème actuel pour ce service."
+        case .german:
+            return "Wähle eine Farbe oder gib einen Hex-Wert wie #F26B1D ein. Zurücksetzen stellt für diesen Dienst die aktuelle Themenfarbe wieder her."
+        case .japanese:
+            return "色を選ぶか、#F26B1D のような 16 進数の値を入力してください。リセットすると、そのサービスは現在のテーマ色に戻ります。"
+        case .korean:
+            return "색을 고르거나 #F26B1D 같은 헥스 값을 입력하세요. 재설정을 누르면 해당 서비스는 현재 테마 색상으로 돌아갑니다."
+        case .chineseSimplified:
+            return "选择颜色，或输入类似 #F26B1D 的十六进制值。重置会让该服务恢复为当前主题颜色。"
         }
     }
 

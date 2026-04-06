@@ -10,6 +10,9 @@ struct LocalizationAndFormattingTests {
         #expect(korean.windowLabel(.fiveHour) == "5시간")
         #expect(korean.windowLabel(.weekly) == "주간")
         #expect(korean.displayMessage("Loading…") == "로딩 중…")
+        #expect(korean.colors == "색상")
+        #expect(korean.reset == "재설정")
+        #expect(korean.claudeColor == "Claude 색상")
     }
 
     @Test
@@ -36,5 +39,22 @@ struct LocalizationAndFormattingTests {
         #expect(AppTheme.find("missing-theme").id == AppTheme.defaultTheme.id)
         #expect(StatusItemFormatter.text(prefix: "Cl", snapshot: snapshot, mode: .usage) == "Cl 12/77")
         #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .insight) == "Cx +10%")
+    }
+
+    @Test
+    func customAccentHexOverridesSelectedTheme() {
+        let suiteName = "AIPaceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set("#123ABC", forKey: AppTheme.customClaudeAccentDefaultsKey)
+
+        let theme = AppTheme.resolvedTheme(themeID: AppTheme.sunset.id, userDefaults: defaults)
+
+        #expect(AppColorHex.normalized("f60") == "#FF6600")
+        #expect(AppColorHex.string(from: theme.claudeAccent) == "#123ABC")
+        #expect(AppColorHex.string(from: theme.codexAccent) == AppColorHex.string(from: AppTheme.sunset.codexAccent))
     }
 }
