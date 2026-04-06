@@ -46,6 +46,7 @@ AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` u
 ## What You'll Need
 
 - macOS 14 or later
+- Xcode with Swift 6.2 support, or a Swift 6.2 toolchain
 - `claude` installed and logged in (for Claude usage)
 - `codex` installed and logged in (for Codex usage)
 
@@ -84,22 +85,24 @@ This app depends on local auth state and provider APIs that can change. If you u
 
 ## Getting Started
 
-### Option 1: Download The DMG
+### Option 1: Build A DMG Locally
 
-1. Open the latest release on GitHub: [Releases](https://github.com/lbybrilee/ai-pace/releases)
-2. Download the `.dmg`
-3. Drag `AIPace` into `Applications`
-4. Launch the app and look for the flask icon in your menu bar
+If you want a DMG, build it yourself from this repo:
 
-### Option 2: Terminal
+```bash
+cd /path/to/ai-pace
+./scripts/build-dmg.sh --version 1.0.0
+```
 
-For a local build, you will need Xcode with Swift 6.2 support or a Swift 6.2 toolchain.
+This creates a DMG in the `dist/` folder. Open that DMG and install the app the same way you would other Mac apps: drag `AIPace` into `Applications`.
+
+### Option 2: Run From Terminal
 
 ```bash
 cd app && swift run
 ```
 
-After launch, look for the flask icon in your menu bar.
+After launch, look for the Claude and Codex stats in your menu bar.
 
 ## Troubleshooting
 

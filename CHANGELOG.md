@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project follows semantic versioning.
 
+## [Unreleased]
+
+### Changed
+- The project no longer publishes a GitHub Release workflow
+- README now documents running the app locally or building a DMG with `./scripts/build-dmg.sh`
+
 ## [1.0.0] - 2026-04-06
 
 ### Added
@@ -13,11 +19,7 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 - Settings window for language, auto refresh, notification sound, menu bar display mode, and custom provider colors
 - README screenshots and DMG-based install instructions
 
-### Changed
-- Release packaging now publishes `AIPace-1.0.0.dmg` for GitHub Releases
-
 ## [0.1.0] - 2026-04-06
 
 ### Added
 - Initial app packaging and release workflow groundwork
-
