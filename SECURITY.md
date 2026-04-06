@@ -2,15 +2,15 @@
 
 ## Supported Versions
 
-This project is currently source-first and does not maintain long-term support branches. Security fixes are expected to land on `main`.
+Security fixes are made in `main`.
 
 ## Reporting A Vulnerability
 
-If you discover a security issue:
+If you find a security issue:
 
 1. Do not post full details in a public GitHub issue.
-2. Use GitHub Private Vulnerability Reporting for the repository if it is enabled.
-3. If private reporting is not enabled, contact the maintainer privately through GitHub before disclosing details publicly.
+2. Use GitHub Private Vulnerability Reporting if it is available.
+3. If private reporting is not available, contact the maintainer privately through GitHub before sharing details publicly.
 
 Please include:
 
@@ -27,4 +27,4 @@ Please report issues involving:
 - Token refresh and credential persistence
 - Logging of auth-related data
 - Provider requests that could expose tokens or account details
-- Packaging or release artifacts that weaken local security expectations
+- App packaging or release artifacts that weaken local security expectations

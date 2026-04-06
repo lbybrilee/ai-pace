@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct AppTheme: Identifiable {
@@ -72,8 +73,95 @@ struct AppTheme: Identifiable {
     ]
 
     static let defaultTheme = sunset
+    static let customClaudeAccentDefaultsKey = "customClaudeAccentHex"
+    static let customCodexAccentDefaultsKey = "customCodexAccentHex"
 
     static func find(_ id: String) -> AppTheme {
         all.first { $0.id == id } ?? defaultTheme
+    }
+
+    func overriding(claudeAccent: Color? = nil, codexAccent: Color? = nil) -> AppTheme {
+        AppTheme(
+            id: id,
+            name: name,
+            claudeAccent: claudeAccent ?? self.claudeAccent,
+            codexAccent: codexAccent ?? self.codexAccent
+        )
+    }
+
+    static func resolvedTheme(themeID: String, userDefaults: UserDefaults = .standard) -> AppTheme {
+        resolvedTheme(
+            themeID: themeID,
+            customClaudeAccentHex: userDefaults.string(forKey: customClaudeAccentDefaultsKey),
+            customCodexAccentHex: userDefaults.string(forKey: customCodexAccentDefaultsKey)
+        )
+    }
+
+    static func resolvedTheme(
+        themeID: String,
+        customClaudeAccentHex: String?,
+        customCodexAccentHex: String?
+    ) -> AppTheme {
+        find(themeID).overriding(
+            claudeAccent: AppColorHex.color(from: customClaudeAccentHex),
+            codexAccent: AppColorHex.color(from: customCodexAccentHex)
+        )
+    }
+}
+
+enum AppColorHex {
+    static func normalized(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        let trimmed = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "#", with: "")
+            .uppercased()
+
+        let expanded: String
+        switch trimmed.count {
+        case 3:
+            expanded = trimmed.map { "\($0)\($0)" }.joined()
+        case 6:
+            expanded = trimmed
+        default:
+            return nil
+        }
+
+        guard expanded.allSatisfy(\.isHexDigit) else {
+            return nil
+        }
+
+        return "#\(expanded)"
+    }
+
+    static func color(from value: String?) -> Color? {
+        guard let normalized = normalized(value) else {
+            return nil
+        }
+
+        let hex = String(normalized.dropFirst())
+        guard let int = UInt32(hex, radix: 16) else {
+            return nil
+        }
+
+        let red = Double((int >> 16) & 0xFF) / 255
+        let green = Double((int >> 8) & 0xFF) / 255
+        let blue = Double(int & 0xFF) / 255
+        return Color(red: red, green: green, blue: blue)
+    }
+
+    static func string(from color: Color) -> String? {
+        let nsColor = NSColor(color)
+        guard let srgb = nsColor.usingColorSpace(.sRGB) else {
+            return nil
+        }
+
+        let red = Int((srgb.redComponent * 255).rounded())
+        let green = Int((srgb.greenComponent * 255).rounded())
+        let blue = Int((srgb.blueComponent * 255).rounded())
+        return String(format: "#%02X%02X%02X", red, green, blue)
     }
 }

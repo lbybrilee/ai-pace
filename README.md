@@ -1,24 +1,44 @@
+<p align="center">
+  <img src="app/Resources/AppIcon.iconset/icon_512x512.png" alt="AIPace logo" width="128" height="128">
+</p>
+
 # AIPace
 
-**A macOS menu bar app for keeping an eye on your AI usage.**
+**A macOS menu bar app that shows your AI usage.**
 
-AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` usage for Claude and Codex — right from your Mac, no extra logins needed.
+AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` usage for Claude and Codex on your Mac. It uses your existing CLI login, so there is nothing extra to sign in to.
 
 > This project is unofficial and is not affiliated with, endorsed by, or maintained by Anthropic or OpenAI.
 
 ## Features
 
-- 🧪 A flask icon in your menu bar, built with SwiftUI
-- 📊 See your Claude and Codex `5h` + `weekly` usage at a glance
-- 🔐 No need to paste tokens — it reuses your existing local CLI login
+- 🧪 Menu bar app built with SwiftUI
+- 📊 Claude and Codex `5h` and `weekly` usage in one place
+- 🔐 Uses your existing local CLI login
 - 🔔 Optional notifications when a usage window refreshes
-- ⏱️ Auto-refreshes every 5 minutes by default, configurable
-- 🧠 Pacing insights that show where you are in your current usage window
+- ⏱️ Refreshes every 5 minutes by default
+- 🎨 Custom Claude and Codex colors
+- 🧠 Pacing insights for the current usage window
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/image.png" alt="AIPace menu bar overview" width="700">
+</p>
+
+<p align="center">
+  <img src="docs/images/image-v1.png" alt="AIPace screenshot 1" width="340">
+  <img src="docs/images/image-v2.png" alt="AIPace screenshot 2" width="340">
+</p>
+
+<p align="center">
+  <img src="docs/images/image-v3.png" alt="AIPace screenshot 3" width="340">
+  <img src="docs/images/image-v4.png" alt="AIPace screenshot 4" width="340">
+</p>
 
 ## What You'll Need
 
 - macOS 14 or later
-- Xcode with Swift 6.2 support, or a Swift 6.2 toolchain
 - `claude` installed and logged in (for Claude usage)
 - `codex` installed and logged in (for Codex usage)
 
@@ -39,88 +59,40 @@ Then it calls:
 
 It also reads `~/.claude.json -> oauthAccount` for display info only.
 
-**Note:** If macOS asks you about Keychain access, that's expected — it's the system prompting when the app reads Claude credentials from Keychain.
+**Note:** If macOS asks for Keychain access, that is expected. The app is reading your Claude credentials from Keychain.
 
 ### Codex
 
-AIPace uses `codex app-server` JSON-RPC with your existing Codex login. It launches from your home directory to avoid workspace trust prompts.
+AIPace uses `codex app-server` with your existing Codex login. It launches from your home directory so you do not get workspace trust prompts.
 
 ## Privacy & Security
 
-- **No telemetry** — nothing is tracked
-- **No backend** — no proxy or app server involved
-- **Local only** — credentials are read from your existing CLI auth state
-- **Direct connections** — network requests go straight from your Mac to provider endpoints
-- **No syncing** — tokens never leave your machine
+- **No telemetry**: nothing is tracked
+- **No backend**: there is no proxy or app server
+- **Local only**: credentials come from your existing CLI auth state
+- **Direct connections**: requests go from your Mac to provider endpoints
+- **No syncing**: tokens stay on your machine
 
-This project works with local auth state and depends on provider APIs and CLI contracts that could change. If you're using this in a security-sensitive environment, review the code first.
+This app depends on local auth state and provider APIs that can change. If you use it in a security-sensitive environment, review the code first.
 
 ## Getting Started
 
-### Option 1: Xcode
+### Option 1: Download The DMG
 
-1. In Xcode, choose `File -> Open...`
-2. Select `app/Package.swift` (not the repo root)
-3. Run the `AIPace` executable target
-
-This repository is a Swift Package. It does not include an `.xcodeproj` or `.xcworkspace`, so opening the top-level folder will not work the same way as a typical Xcode project.
+1. Open the latest release on GitHub
+2. Download the `.dmg`
+3. Drag `AIPace` into `Applications`
+4. Launch the app and look for the flask icon in your menu bar
 
 ### Option 2: Terminal
+
+For a local build, you will need Xcode with Swift 6.2 support or a Swift 6.2 toolchain.
 
 ```bash
 cd app && swift run
 ```
 
 After launch, look for the flask icon in your menu bar.
-
-## Run Tests
-
-Run the unit test suite from the repo root:
-
-```bash
-./scripts/test.sh
-```
-
-The script prefers the full Xcode toolchain when it is installed, which avoids the missing test framework problem some Command Line Tools setups have with plain `swift test`.
-
-## Build a DMG
-
-Build an unsigned DMG locally:
-
-```bash
-./scripts/build-dmg.sh --version 0.1.0
-```
-
-Artifacts are written to `dist/`.
-
-## Sign and Notarize
-
-For distribution outside the Mac App Store, sign the app with a `Developer ID Application` certificate and notarize the DMG with `notarytool`.
-
-1. List your signing identities:
-
-```bash
-security find-identity -v -p codesigning
-```
-
-2. Store notarization credentials in Keychain:
-
-```bash
-xcrun notarytool store-credentials AC_NOTARY \
-  --apple-id "you@example.com" \
-  --team-id TEAMID
-```
-
-3. Build, sign, notarize, and staple the DMG:
-
-```bash
-./scripts/build-dmg.sh \
-  --version 0.1.0 \
-  --sign "Developer ID Application: Your Name (TEAMID)" \
-  --notarize-profile AC_NOTARY
-```
-
-The script signs the `.app` with hardened runtime enabled, submits the `.dmg` to Apple, then staples the notarization ticket to the `.dmg`.
 
 ## Troubleshooting
 
@@ -131,21 +103,15 @@ The script signs the `.app` with hardened runtime enabled, submits the `.dmg` to
 | Codex unavailable | Check that the `codex` CLI is installed, on your `PATH`, and logged in |
 | Codex works in Terminal but not from Xcode | Xcode-launched apps often inherit a different `PATH`; AIPace now augments `PATH` with your login shell and common macOS install directories |
 | Usage stuck on loading | Try the refresh button, then relaunch the app so it picks up your current shell environment |
-| Xcode will not open the app | Open `app/Package.swift`, not the repo root, and make sure your Xcode version supports `swift-tools-version: 6.2` |
-
-## Good to Know
-
-- The app relies on local CLI install paths and auth state
-- `codex app-server` and the Claude OAuth usage flow are external integrations that may change over time
-- The GitHub release workflow currently builds an unsigned DMG unless you add signing credentials in CI
+| Local build fails | Make sure your Xcode version supports `swift-tools-version: 6.2`, or use a Swift 6.2 toolchain |
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
+Want to help? See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for reporting security concerns.
+To report a security issue, see [SECURITY.md](SECURITY.md).
 
 ## License
 
