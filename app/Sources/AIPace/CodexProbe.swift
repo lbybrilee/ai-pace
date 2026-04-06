@@ -1,6 +1,6 @@
 import Foundation
 
-struct CodexProbe {
+struct CodexProbe: Sendable {
     func fetch() async -> ProviderSnapshot {
         do {
             let limits = try await fetchRateLimits()
@@ -45,6 +45,7 @@ struct CodexProbe {
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
         process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        process.environment = ProcessRunner.environment()
 
         try process.run()
         defer {
@@ -101,7 +102,7 @@ struct CodexProbe {
         )
     }
 
-    private func parseWindow(_ value: Any?) -> CodexRateLimitWindow? {
+    func parseWindow(_ value: Any?) -> CodexRateLimitWindow? {
         guard let window = value as? [String: Any] else {
             return nil
         }
@@ -112,7 +113,7 @@ struct CodexProbe {
         return CodexRateLimitWindow(usedPercent: usedPercent, resetsAt: resetsAt)
     }
 
-    private func numericValue(_ value: Any?) -> Double? {
+    func numericValue(_ value: Any?) -> Double? {
         switch value {
         case let number as Double:
             return number
@@ -128,33 +129,32 @@ struct CodexProbe {
     }
 }
 
-private struct CodexRateLimits {
+struct CodexRateLimits {
     let primary: CodexRateLimitWindow?
     let secondary: CodexRateLimitWindow?
     let planType: String?
 }
 
-private struct CodexRateLimitWindow: Sendable {
+struct CodexRateLimitWindow: Sendable, Equatable {
     let usedPercent: Double
     let resetsAt: Date?
 }
 
-private func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
+func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
     let data = try JSONSerialization.data(withJSONObject: object)
     handle.write(data)
     handle.write(Data([0x0A]))
 }
 
-private func readResponse<S: AsyncSequence>(
+func readResponse<S: AsyncSequence>(
     withID id: Int,
     from lines: S
 ) async throws -> [String: Any] where S.Element == String {
     for try await line in lines {
-        guard
-            !line.isEmpty,
-            let data = line.data(using: .utf8),
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        guard !line.isEmpty, let data = line.data(using: .utf8) else {
+            continue
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             continue
         }
 
@@ -171,7 +171,7 @@ private func readResponse<S: AsyncSequence>(
     throw ProcessRunnerError.invalidResponse("Codex app-server closed before returning response id \(id).")
 }
 
-private func integerValue(_ value: Any?) -> Int? {
+func integerValue(_ value: Any?) -> Int? {
     switch value {
     case let number as Int:
         return number

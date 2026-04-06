@@ -42,16 +42,22 @@ struct ClaudeCredentialLoader {
     private let homeDirectory: URL
     private let environment: [String: String]
     private let keychainService: String
+    private let keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>?
+    private let keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)?
     private static let refreshBufferMs: Double = 5 * 60 * 1000
 
     init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        keychainService: String = "Claude Code-credentials"
+        keychainService: String = "Claude Code-credentials",
+        keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>? = nil,
+        keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)? = nil
     ) {
         self.homeDirectory = homeDirectory
         self.environment = environment
         self.keychainService = keychainService
+        self.keychainLoadOverride = keychainLoadOverride
+        self.keychainSaveOverride = keychainSaveOverride
     }
 
     func loadCredentials() -> ClaudeCredentialResult? {
@@ -117,6 +123,10 @@ struct ClaudeCredentialLoader {
     }
 
     private func loadFromKeychain() -> Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> {
+        if let keychainLoadOverride {
+            return keychainLoadOverride
+        }
+
         do {
             let output = try ProcessRunner.runSync(
                 executable: "/usr/bin/security",
@@ -196,6 +206,11 @@ struct ClaudeCredentialLoader {
     }
 
     private func saveToKeychain(_ result: ClaudeCredentialResult) {
+        if let keychainSaveOverride {
+            keychainSaveOverride(result)
+            return
+        }
+
         guard
             let root = updatedFullData(for: result),
             let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted]),
@@ -262,7 +277,7 @@ struct ClaudeCredentialLoader {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private func mapKeychainError(_ error: ProcessRunnerError) -> Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> {
+    func mapKeychainError(_ error: ProcessRunnerError) -> Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> {
         guard case .terminated(_, let output) = error else {
             return .failure(.keychainFailure(error.localizedDescription))
         }

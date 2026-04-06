@@ -1,15 +1,18 @@
 import Foundation
 
-struct ClaudeProbe {
+struct ClaudeProbe: Sendable {
     private let credentialLoader: ClaudeCredentialLoader
     private let accountInfoResolver: ClaudeAccountInfoResolver
+    private let apiClient: ClaudeAPIClient
 
     init(
         credentialLoader: ClaudeCredentialLoader = ClaudeCredentialLoader(),
-        accountInfoResolver: ClaudeAccountInfoResolver = ClaudeAccountInfoResolver()
+        accountInfoResolver: ClaudeAccountInfoResolver = ClaudeAccountInfoResolver(),
+        apiClient: ClaudeAPIClient = ClaudeAPIClient()
     ) {
         self.credentialLoader = credentialLoader
         self.accountInfoResolver = accountInfoResolver
+        self.apiClient = apiClient
     }
 
     func fetch() async -> ProviderSnapshot {
@@ -21,7 +24,7 @@ struct ClaudeProbe {
                 if let issue = resolution.issue {
                     throw ProcessRunnerError.invalidResponse(issue.message)
                 }
-                if let statusData = try? await fetchStatus(), statusData.loggedIn == true {
+                if let statusData = try? await apiClient.fetchStatus(), statusData.loggedIn == true {
                     throw ProcessRunnerError.invalidResponse("Claude is logged in, but credentials could not be read from file, Keychain, or environment.")
                 }
                 throw ProcessRunnerError.invalidResponse("Claude credentials not found.")
@@ -31,7 +34,7 @@ struct ClaudeProbe {
                 if credentials.source == .environment {
                     // setup-token style credentials have no refresh flow; use them as-is
                 } else if credentials.oauth.refreshToken != nil {
-                    credentials = try await refreshToken(credentials)
+                    credentials = try await apiClient.refreshToken(credentials, credentialLoader)
                 } else {
                     throw ProcessRunnerError.invalidResponse("Claude session expired; log in again.")
                 }
@@ -39,13 +42,13 @@ struct ClaudeProbe {
 
             let usage: ClaudeUsageResponse
             do {
-                usage = try await fetchUsage(with: credentials.oauth.accessToken)
+                usage = try await apiClient.fetchUsage(credentials.oauth.accessToken)
             } catch let error as ProcessRunnerError {
                 if shouldRetryAfterAuthenticationError(error),
                    credentials.source != .environment,
                    credentials.oauth.refreshToken != nil {
-                    credentials = try await refreshToken(credentials)
-                    usage = try await fetchUsage(with: credentials.oauth.accessToken)
+                    credentials = try await apiClient.refreshToken(credentials, credentialLoader)
+                    usage = try await apiClient.fetchUsage(credentials.oauth.accessToken)
                 } else {
                     throw error
                 }
@@ -77,7 +80,7 @@ struct ClaudeProbe {
         }
     }
 
-    private func fetchStatus() async throws -> ClaudeAuthStatus {
+    static func liveFetchStatus() async throws -> ClaudeAuthStatus {
         let output = try await ProcessRunner.run(
             executable: "claude",
             arguments: ["auth", "status", "--json"],
@@ -86,7 +89,10 @@ struct ClaudeProbe {
         return try JSONDecoder().decode(ClaudeAuthStatus.self, from: Data(output.utf8))
     }
 
-    private func refreshToken(_ credentials: ClaudeCredentialResult) async throws -> ClaudeCredentialResult {
+    static func liveRefreshToken(
+        _ credentials: ClaudeCredentialResult,
+        credentialLoader: ClaudeCredentialLoader
+    ) async throws -> ClaudeCredentialResult {
         guard let refreshToken = credentials.oauth.refreshToken else {
             return credentials
         }
@@ -136,7 +142,7 @@ struct ClaudeProbe {
         return updated
     }
 
-    private func fetchUsage(with accessToken: String) async throws -> ClaudeUsageResponse {
+    static func liveFetchUsage(with accessToken: String) async throws -> ClaudeUsageResponse {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.httpMethod = "GET"
         request.timeoutInterval = 20
@@ -167,7 +173,7 @@ struct ClaudeProbe {
         }
     }
 
-    private func parseISODate(_ isoString: String?) -> Date? {
+    func parseISODate(_ isoString: String?) -> Date? {
         guard let isoString else {
             return nil
         }
@@ -182,7 +188,7 @@ struct ClaudeProbe {
         return formatter.date(from: isoString)
     }
 
-    private func detailText(from credentials: ClaudeCredentialResult, accountInfo: ClaudeAccountInfo?) -> String? {
+    func detailText(from credentials: ClaudeCredentialResult, accountInfo: ClaudeAccountInfo?) -> String? {
         let tier = credentials.oauth.subscriptionType
             .map(formatSubscriptionType(_:))
         let identity = accountInfo?.displayName ?? accountInfo?.email ?? accountInfo?.organizationName
@@ -190,7 +196,7 @@ struct ClaudeProbe {
         return [tier, identity].compactMap { $0 }.joined(separator: " · ").nilIfEmpty
     }
 
-    private func formatSubscriptionType(_ raw: String) -> String {
+    func formatSubscriptionType(_ raw: String) -> String {
         switch raw.lowercased() {
         case "claude_max", "max":
             return "Max"
@@ -203,7 +209,7 @@ struct ClaudeProbe {
         }
     }
 
-    private func shouldRetryAfterAuthenticationError(_ error: ProcessRunnerError) -> Bool {
+    func shouldRetryAfterAuthenticationError(_ error: ProcessRunnerError) -> Bool {
         guard case .invalidResponse(let message) = error else {
             return false
         }
@@ -211,11 +217,27 @@ struct ClaudeProbe {
     }
 }
 
-private struct ClaudeAuthStatus: Decodable {
+struct ClaudeAPIClient: Sendable {
+    let fetchStatus: @Sendable () async throws -> ClaudeAuthStatus
+    let refreshToken: @Sendable (ClaudeCredentialResult, ClaudeCredentialLoader) async throws -> ClaudeCredentialResult
+    let fetchUsage: @Sendable (String) async throws -> ClaudeUsageResponse
+
+    init(
+        fetchStatus: @escaping @Sendable () async throws -> ClaudeAuthStatus = ClaudeProbe.liveFetchStatus,
+        refreshToken: @escaping @Sendable (ClaudeCredentialResult, ClaudeCredentialLoader) async throws -> ClaudeCredentialResult = ClaudeProbe.liveRefreshToken,
+        fetchUsage: @escaping @Sendable (String) async throws -> ClaudeUsageResponse = ClaudeProbe.liveFetchUsage(with:)
+    ) {
+        self.fetchStatus = fetchStatus
+        self.refreshToken = refreshToken
+        self.fetchUsage = fetchUsage
+    }
+}
+
+struct ClaudeAuthStatus: Decodable, Sendable {
     let loggedIn: Bool?
 }
 
-private struct ClaudeUsageResponse: Decodable {
+struct ClaudeUsageResponse: Decodable, Sendable {
     let fiveHour: ClaudeQuotaData?
     let sevenDay: ClaudeQuotaData?
 
@@ -225,7 +247,7 @@ private struct ClaudeUsageResponse: Decodable {
     }
 }
 
-private struct ClaudeQuotaData: Decodable {
+struct ClaudeQuotaData: Decodable, Sendable {
     let utilization: Double?
     let resetsAt: String?
 
@@ -235,7 +257,7 @@ private struct ClaudeQuotaData: Decodable {
     }
 }
 
-private struct ClaudeRefreshResponse: Decodable {
+struct ClaudeRefreshResponse: Decodable, Sendable {
     let accessToken: String?
     let refreshToken: String?
     let expiresIn: Int?
@@ -247,7 +269,7 @@ private struct ClaudeRefreshResponse: Decodable {
     }
 }
 
-private struct ClaudeRefreshErrorResponse: Decodable {
+struct ClaudeRefreshErrorResponse: Decodable, Sendable {
     let error: String?
 }
 

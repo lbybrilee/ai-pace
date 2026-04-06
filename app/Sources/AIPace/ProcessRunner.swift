@@ -22,15 +22,11 @@ enum ProcessRunnerError: LocalizedError {
 
 enum ProcessRunner {
     static func which(_ executable: String) -> String? {
-        let env = ProcessInfo.processInfo.environment
-        let path = env["PATH"] ?? ""
-        for directory in path.split(separator: ":") {
-            let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(executable).path
-            if FileManager.default.isExecutableFile(atPath: candidate) {
-                return candidate
-            }
-        }
-        return nil
+        which(executable, directories: pathDirectories())
+    }
+
+    static func environment() -> [String: String] {
+        environment(base: ProcessInfo.processInfo.environment, pathDirectories: pathDirectories())
     }
 
     static func run(
@@ -73,6 +69,7 @@ enum ProcessRunner {
         process.standardError = stderr
         process.standardInput = stdin
         process.currentDirectoryURL = currentDirectory
+        process.environment = environment()
 
         try process.run()
 
@@ -108,5 +105,113 @@ enum ProcessRunner {
         }
 
         return output
+    }
+
+    static func which(_ executable: String, directories: [String]) -> String? {
+        for directory in directories {
+            let candidate = URL(fileURLWithPath: directory).appendingPathComponent(executable).path
+            if FileManager.default.isExecutableFile(atPath: candidate) {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    static func environment(base: [String: String], pathDirectories: [String]) -> [String: String] {
+        var env = base
+        env["PATH"] = pathDirectories.joined(separator: ":")
+        return env
+    }
+
+    static func pathDirectories(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        loginShellPath: String? = ProcessRunner.loginShellPath(),
+        homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
+    ) -> [String] {
+        var directories: [String] = []
+
+        func appendPathEntries(from path: String?) {
+            guard let path else { return }
+            for entry in path.split(separator: ":") {
+                let directory = expandUserPath(String(entry), homeDirectory: homeDirectory)
+                guard !directory.isEmpty else { continue }
+                guard !directories.contains(directory) else { continue }
+                directories.append(directory)
+            }
+        }
+
+        appendPathEntries(from: environment["PATH"])
+        appendPathEntries(from: loginShellPath)
+
+        for directory in [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin",
+            "~/bin",
+            "~/.local/bin",
+        ] {
+            let expanded = expandUserPath(directory, homeDirectory: homeDirectory)
+            guard !directories.contains(expanded) else { continue }
+            directories.append(expanded)
+        }
+
+        return directories
+    }
+
+    private static func loginShellPath() -> String? {
+        let shellCandidates = [
+            ProcessInfo.processInfo.environment["SHELL"],
+            "/bin/zsh",
+            "/bin/bash",
+        ].compactMap { $0 }
+
+        for shell in shellCandidates where FileManager.default.isExecutableFile(atPath: shell) {
+            let process = Process()
+            let stdout = Pipe()
+
+            process.executableURL = URL(fileURLWithPath: shell)
+            process.arguments = ["-l", "-c", "printf %s \"$PATH\""]
+            process.standardOutput = stdout
+            process.standardError = FileHandle.nullDevice
+            process.environment = ProcessInfo.processInfo.environment
+            process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                guard process.terminationStatus == 0 else { continue }
+
+                let data = stdout.fileHandleForReading.readDataToEndOfFile()
+                let path = String(decoding: data, as: UTF8.self)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !path.isEmpty {
+                    return path
+                }
+            } catch {
+                continue
+            }
+        }
+
+        return nil
+    }
+
+    static func expandUserPath(
+        _ path: String,
+        homeDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
+    ) -> String {
+        guard path.hasPrefix("~") else {
+            return path
+        }
+
+        if path == "~" {
+            return homeDirectory
+        }
+        if path.hasPrefix("~/") {
+            return homeDirectory + String(path.dropFirst())
+        }
+        return path
     }
 }
