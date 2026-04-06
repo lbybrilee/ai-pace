@@ -1,0 +1,485 @@
+import Foundation
+
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case english = "en"
+    case spanish = "es"
+    case french = "fr"
+    case german = "de"
+    case japanese = "ja"
+    case korean = "ko"
+    case chineseSimplified = "zh-Hans"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .english: return "English"
+        case .spanish: return "Español"
+        case .french: return "Français"
+        case .german: return "Deutsch"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .chineseSimplified: return "简体中文"
+        }
+    }
+}
+
+struct Loc {
+    let lang: AppLanguage
+
+    var usage: String {
+        switch lang {
+        case .english: return "Usage"
+        case .spanish: return "Uso"
+        case .french: return "Utilisation"
+        case .german: return "Nutzung"
+        case .japanese: return "使用量"
+        case .korean: return "사용량"
+        case .chineseSimplified: return "用量"
+        }
+    }
+
+    var settings: String {
+        switch lang {
+        case .english: return "Settings"
+        case .spanish: return "Ajustes"
+        case .french: return "Réglages"
+        case .german: return "Einstellungen"
+        case .japanese: return "設定"
+        case .korean: return "설정"
+        case .chineseSimplified: return "设置"
+        }
+    }
+
+    var autoRefresh: String {
+        switch lang {
+        case .english: return "Auto Refresh"
+        case .spanish: return "Actualización automática"
+        case .french: return "Actualisation auto"
+        case .german: return "Automatische Aktualisierung"
+        case .japanese: return "自動更新"
+        case .korean: return "자동 새로고침"
+        case .chineseSimplified: return "自动刷新"
+        }
+    }
+
+    var notifications: String {
+        switch lang {
+        case .english: return "Notifications"
+        case .spanish: return "Notificaciones"
+        case .french: return "Notifications"
+        case .german: return "Mitteilungen"
+        case .japanese: return "通知"
+        case .korean: return "알림"
+        case .chineseSimplified: return "通知"
+        }
+    }
+
+    var providers: String {
+        switch lang {
+        case .english: return "Providers"
+        case .spanish: return "Proveedores"
+        case .french: return "Services"
+        case .german: return "Dienste"
+        case .japanese: return "プロバイダ"
+        case .korean: return "제공자"
+        case .chineseSimplified: return "服务"
+        }
+    }
+
+    var agents: String {
+        switch lang {
+        case .english: return "Agents"
+        case .spanish: return "Agentes"
+        case .french: return "Agents"
+        case .german: return "Agenten"
+        case .japanese: return "エージェント"
+        case .korean: return "에이전트"
+        case .chineseSimplified: return "代理"
+        }
+    }
+
+    var language: String {
+        switch lang {
+        case .english: return "Language"
+        case .spanish: return "Idioma"
+        case .french: return "Langue"
+        case .german: return "Sprache"
+        case .japanese: return "言語"
+        case .korean: return "언어"
+        case .chineseSimplified: return "语言"
+        }
+    }
+
+    var openSettings: String {
+        switch lang {
+        case .english: return "Open Settings"
+        case .spanish: return "Abrir ajustes"
+        case .french: return "Ouvrir les réglages"
+        case .german: return "Einstellungen öffnen"
+        case .japanese: return "設定を開く"
+        case .korean: return "설정 열기"
+        case .chineseSimplified: return "打开设置"
+        }
+    }
+
+    var noAgentsMessage: String {
+        switch lang {
+        case .english: return "No authenticated agents are available."
+        case .spanish: return "No hay agentes autenticados disponibles."
+        case .french: return "Aucun agent authentifié n'est disponible."
+        case .german: return "Keine authentifizierten Agenten verfügbar."
+        case .japanese: return "利用可能な認証済みエージェントがありません。"
+        case .korean: return "사용 가능한 인증된 에이전트가 없습니다."
+        case .chineseSimplified: return "没有可用的已认证代理。"
+        }
+    }
+
+    var noAgentsHint: String {
+        switch lang {
+        case .english: return "Open Settings to see availability and setup instructions."
+        case .spanish: return "Abre Ajustes para ver el estado y las instrucciones de configuración."
+        case .french: return "Ouvrez les réglages pour voir l'état et les instructions de configuration."
+        case .german: return "Öffne die Einstellungen, um Status und Einrichtungshinweise zu sehen."
+        case .japanese: return "設定を開くと、状態とセットアップ手順を確認できます。"
+        case .korean: return "설정에서 상태와 설정 안내를 확인하세요."
+        case .chineseSimplified: return "打开设置可查看状态和配置说明。"
+        }
+    }
+
+    var autoRefreshDesc: String {
+        switch lang {
+        case .english:
+            return "Default is 5 minutes. Changing this restarts the background refresh loop immediately."
+        case .spanish:
+            return "El valor predeterminado es 5 minutos. Cambiarlo reinicia el ciclo de actualización en segundo plano de inmediato."
+        case .french:
+            return "La valeur par défaut est de 5 minutes. La modifier redémarre immédiatement l'actualisation en arrière-plan."
+        case .german:
+            return "Standard sind 5 Minuten. Eine Änderung startet die Hintergrundaktualisierung sofort neu."
+        case .japanese:
+            return "デフォルトは5分です。変更するとバックグラウンド更新ループがすぐに再起動します。"
+        case .korean:
+            return "기본값은 5분입니다. 변경 시 즉시 새로고침이 재시작됩니다."
+        case .chineseSimplified:
+            return "默认值为 5 分钟。更改后会立即重启后台刷新循环。"
+        }
+    }
+
+    var notificationsDesc: String {
+        switch lang {
+        case .english:
+            return "Tap the bell icon on any row to get notified when that usage window resets."
+        case .spanish:
+            return "Pulsa la campana de cualquier fila para recibir una notificación cuando se reinicie esa ventana de uso."
+        case .french:
+            return "Touchez la cloche d'une ligne pour être averti lorsque cette fenêtre d'utilisation se réinitialise."
+        case .german:
+            return "Tippe auf die Glocke einer Zeile, um benachrichtigt zu werden, wenn sich dieses Nutzungsfenster zurücksetzt."
+        case .japanese:
+            return "各行のベルを押すと、その使用量ウィンドウがリセットされたときに通知されます。"
+        case .korean:
+            return "종 아이콘을 탭하면 사용량 갱신 시 알림을 받을 수 있습니다."
+        case .chineseSimplified:
+            return "点击任一行的铃铛图标，即可在该用量窗口重置时收到通知。"
+        }
+    }
+
+    var providersDesc: String {
+        switch lang {
+        case .english:
+            return "Codex uses codex app-server. Claude reads credentials from file, Keychain, then CLAUDE_CODE_OAUTH_TOKEN."
+        case .spanish:
+            return "Codex usa codex app-server. Claude lee credenciales desde archivo, Llavero y luego CLAUDE_CODE_OAUTH_TOKEN."
+        case .french:
+            return "Codex utilise codex app-server. Claude lit les identifiants depuis le fichier, le Trousseau, puis CLAUDE_CODE_OAUTH_TOKEN."
+        case .german:
+            return "Codex verwendet codex app-server. Claude liest Anmeldedaten aus Datei, Schlüsselbund und danach CLAUDE_CODE_OAUTH_TOKEN."
+        case .japanese:
+            return "Codex は codex app-server を使います。Claude はファイル、キーチェーン、CLAUDE_CODE_OAUTH_TOKEN の順で認証情報を読み込みます。"
+        case .korean:
+            return "Codex는 codex app-server를 사용합니다. Claude는 파일, 키체인, CLAUDE_CODE_OAUTH_TOKEN 순으로 자격 증명을 읽습니다."
+        case .chineseSimplified:
+            return "Codex 使用 codex app-server。Claude 会依次从文件、钥匙串和 CLAUDE_CODE_OAUTH_TOKEN 读取凭证。"
+        }
+    }
+
+    func windowLabel(_ kind: UsageWindowKind) -> String {
+        switch kind {
+        case .fiveHour:
+            switch lang {
+            case .english, .spanish, .french, .german, .japanese, .chineseSimplified:
+                return "5h"
+            case .korean:
+                return "5시간"
+            }
+        case .weekly:
+            switch lang {
+            case .english: return "Week"
+            case .spanish: return "Semana"
+            case .french: return "Semaine"
+            case .german: return "Woche"
+            case .japanese: return "週"
+            case .korean: return "주간"
+            case .chineseSimplified: return "周"
+            }
+        }
+    }
+
+    func refreshLabel(_ interval: AutoRefreshInterval) -> String {
+        switch lang {
+        case .english:
+            return interval.label
+        case .spanish:
+            switch interval {
+            case .oneMinute: return "1 minuto"
+            case .twoMinutes: return "2 minutos"
+            case .fiveMinutes: return "5 minutos"
+            case .tenMinutes: return "10 minutos"
+            case .fifteenMinutes: return "15 minutos"
+            case .thirtyMinutes: return "30 minutos"
+            }
+        case .french:
+            switch interval {
+            case .oneMinute: return "1 minute"
+            case .twoMinutes: return "2 minutes"
+            case .fiveMinutes: return "5 minutes"
+            case .tenMinutes: return "10 minutes"
+            case .fifteenMinutes: return "15 minutes"
+            case .thirtyMinutes: return "30 minutes"
+            }
+        case .german:
+            switch interval {
+            case .oneMinute: return "1 Minute"
+            case .twoMinutes: return "2 Minuten"
+            case .fiveMinutes: return "5 Minuten"
+            case .tenMinutes: return "10 Minuten"
+            case .fifteenMinutes: return "15 Minuten"
+            case .thirtyMinutes: return "30 Minuten"
+            }
+        case .japanese:
+            switch interval {
+            case .oneMinute: return "1分"
+            case .twoMinutes: return "2分"
+            case .fiveMinutes: return "5分"
+            case .tenMinutes: return "10分"
+            case .fifteenMinutes: return "15分"
+            case .thirtyMinutes: return "30分"
+            }
+        case .korean:
+            switch interval {
+            case .oneMinute: return "1분"
+            case .twoMinutes: return "2분"
+            case .fiveMinutes: return "5분"
+            case .tenMinutes: return "10분"
+            case .fifteenMinutes: return "15분"
+            case .thirtyMinutes: return "30분"
+            }
+        case .chineseSimplified:
+            switch interval {
+            case .oneMinute: return "1 分钟"
+            case .twoMinutes: return "2 分钟"
+            case .fiveMinutes: return "5 分钟"
+            case .tenMinutes: return "10 分钟"
+            case .fifteenMinutes: return "15 分钟"
+            case .thirtyMinutes: return "30 分钟"
+            }
+        }
+    }
+
+    func displayMessage(_ message: String?) -> String {
+        guard let message else { return "—" }
+        switch (lang, message) {
+        case (.spanish, "Loading…"): return "Cargando…"
+        case (.french, "Loading…"): return "Chargement…"
+        case (.german, "Loading…"): return "Lädt…"
+        case (.japanese, "Loading…"): return "読み込み中…"
+        case (.korean, "Loading…"): return "로딩 중…"
+        case (.chineseSimplified, "Loading…"): return "加载中…"
+        default: break
+        }
+        return message
+    }
+
+    func insightMessage(delta: Double) -> String {
+        let pct = Int(abs(delta).rounded())
+        switch delta {
+        case ..<(-5):
+            switch lang {
+            case .english: return "\(pct)% over pace"
+            case .spanish: return "\(pct)% por encima del ritmo"
+            case .french: return "\(pct)% au-dessus du rythme"
+            case .german: return "\(pct)% über dem Soll"
+            case .japanese: return "\(pct)% ペース超過"
+            case .korean: return "\(pct)% 초과 사용 중"
+            case .chineseSimplified: return "\(pct)% 超出节奏"
+            }
+        case -5...5:
+            switch lang {
+            case .english: return "On pace"
+            case .spanish: return "En ritmo"
+            case .french: return "Dans le rythme"
+            case .german: return "Im Soll"
+            case .japanese: return "順調"
+            case .korean: return "적정 사용 중"
+            case .chineseSimplified: return "节奏正常"
+            }
+        default:
+            switch lang {
+            case .english: return "\(pct)% to spare"
+            case .spanish: return "\(pct)% de margen"
+            case .french: return "\(pct)% de marge"
+            case .german: return "\(pct)% Reserve"
+            case .japanese: return "\(pct)% 余裕あり"
+            case .korean: return "\(pct)% 여유"
+            case .chineseSimplified: return "还有 \(pct)% 余量"
+            }
+        }
+    }
+
+    func statusTitle(_ status: AgentStatus) -> String {
+        switch status.availability {
+        case .loading:
+            switch lang {
+            case .english: return "Checking…"
+            case .spanish: return "Comprobando…"
+            case .french: return "Vérification…"
+            case .german: return "Prüfen…"
+            case .japanese: return "確認中…"
+            case .korean: return "확인 중…"
+            case .chineseSimplified: return "检查中…"
+            }
+        case .available:
+            switch lang {
+            case .english: return "Available"
+            case .spanish: return "Disponible"
+            case .french: return "Disponible"
+            case .german: return "Verfügbar"
+            case .japanese: return "利用可能"
+            case .korean: return "사용 가능"
+            case .chineseSimplified: return "可用"
+            }
+        case .missingAuth:
+            switch lang {
+            case .english: return "Auth not found"
+            case .spanish: return "Sin autenticación"
+            case .french: return "Authentification absente"
+            case .german: return "Anmeldung fehlt"
+            case .japanese: return "認証が見つかりません"
+            case .korean: return "인증 정보 없음"
+            case .chineseSimplified: return "未找到认证"
+            }
+        case .accessDenied:
+            switch lang {
+            case .english: return "Access denied"
+            case .spanish: return "Acceso denegado"
+            case .french: return "Accès refusé"
+            case .german: return "Zugriff verweigert"
+            case .japanese: return "アクセス拒否"
+            case .korean: return "접근 거부됨"
+            case .chineseSimplified: return "访问被拒绝"
+            }
+        case .sessionExpired:
+            switch lang {
+            case .english: return "Session expired"
+            case .spanish: return "Sesión expirada"
+            case .french: return "Session expirée"
+            case .german: return "Sitzung abgelaufen"
+            case .japanese: return "セッション期限切れ"
+            case .korean: return "세션 만료"
+            case .chineseSimplified: return "会话已过期"
+            }
+        case .notInstalled:
+            switch lang {
+            case .english: return "Not installed"
+            case .spanish: return "No instalado"
+            case .french: return "Non installé"
+            case .german: return "Nicht installiert"
+            case .japanese: return "未インストール"
+            case .korean: return "설치되지 않음"
+            case .chineseSimplified: return "未安装"
+            }
+        case .notLoggedIn:
+            switch lang {
+            case .english: return "Not signed in"
+            case .spanish: return "Sin iniciar sesión"
+            case .french: return "Non connecté"
+            case .german: return "Nicht angemeldet"
+            case .japanese: return "未サインイン"
+            case .korean: return "로그인되지 않음"
+            case .chineseSimplified: return "未登录"
+            }
+        case .error:
+            switch lang {
+            case .english: return "Error"
+            case .spanish: return "Error"
+            case .french: return "Erreur"
+            case .german: return "Fehler"
+            case .japanese: return "エラー"
+            case .korean: return "오류"
+            case .chineseSimplified: return "错误"
+            }
+        }
+    }
+
+    func statusInstruction(_ status: AgentStatus) -> String? {
+        switch (status.provider, status.availability) {
+        case (_, .available), (_, .loading):
+            return nil
+        case (.claude, .missingAuth):
+            switch lang {
+            case .english: return "Run `claude` in Terminal, then run `/login`."
+            case .spanish: return "Ejecuta `claude` en Terminal y luego `/login`."
+            case .french: return "Lancez `claude` dans le Terminal, puis exécutez `/login`."
+            case .german: return "Starte `claude` im Terminal und führe dann `/login` aus."
+            case .japanese: return "Terminal で `claude` を実行し、その後 `/login` を実行してください。"
+            case .korean: return "터미널에서 `claude`를 실행한 다음 `/login`을 실행하세요."
+            case .chineseSimplified: return "在终端运行 `claude`，然后执行 `/login`。"
+            }
+        case (.claude, .accessDenied):
+            switch lang {
+            case .english: return "Allow Keychain access for `Claude Code-credentials`, or run `claude` in Terminal and then `/login`."
+            case .spanish: return "Permite el acceso al llavero para `Claude Code-credentials`, o ejecuta `claude` en Terminal y luego `/login`."
+            case .french: return "Autorisez l'accès au Trousseau pour `Claude Code-credentials`, ou lancez `claude` dans le Terminal puis `/login`."
+            case .german: return "Erlaube den Schlüsselbundzugriff für `Claude Code-credentials` oder starte `claude` im Terminal und dann `/login`."
+            case .japanese: return "`Claude Code-credentials` へのキーチェーンアクセスを許可するか、Terminal で `claude` を実行してから `/login` を実行してください。"
+            case .korean: return "`Claude Code-credentials`에 대한 키체인 접근을 허용하거나, 터미널에서 `claude`를 실행한 다음 `/login`을 실행하세요."
+            case .chineseSimplified: return "允许 `Claude Code-credentials` 的钥匙串访问，或在终端运行 `claude` 后执行 `/login`。"
+            }
+        case (.claude, .sessionExpired):
+            switch lang {
+            case .english: return "Run `claude` in Terminal, then run `/login` again."
+            case .spanish: return "Ejecuta `claude` en Terminal y luego `/login` de nuevo."
+            case .french: return "Lancez `claude` dans le Terminal, puis exécutez `/login` à nouveau."
+            case .german: return "Starte `claude` im Terminal und führe dann erneut `/login` aus."
+            case .japanese: return "Terminal で `claude` を実行し、その後もう一度 `/login` を実行してください。"
+            case .korean: return "터미널에서 `claude`를 실행한 다음 `/login`을 다시 실행하세요."
+            case .chineseSimplified: return "在终端运行 `claude`，然后再次执行 `/login`。"
+            }
+        case (.codex, .notInstalled):
+            switch lang {
+            case .english: return "Install the Codex CLI and make sure `codex` is on PATH."
+            case .spanish: return "Instala la CLI de Codex y asegúrate de que `codex` esté en PATH."
+            case .french: return "Installez l'interface CLI Codex et assurez-vous que `codex` est dans le PATH."
+            case .german: return "Installiere die Codex-CLI und stelle sicher, dass `codex` im PATH liegt."
+            case .japanese: return "Codex CLI をインストールし、`codex` が PATH にあることを確認してください。"
+            case .korean: return "Codex CLI를 설치하고 `codex`가 PATH에 있는지 확인하세요."
+            case .chineseSimplified: return "安装 Codex CLI，并确保 `codex` 已加入 PATH。"
+            }
+        case (.codex, .notLoggedIn):
+            switch lang {
+            case .english: return "Run `codex` in Terminal, then run `/login`."
+            case .spanish: return "Ejecuta `codex` en Terminal y luego `/login`."
+            case .french: return "Lancez `codex` dans le Terminal, puis exécutez `/login`."
+            case .german: return "Starte `codex` im Terminal und führe dann `/login` aus."
+            case .japanese: return "Terminal で `codex` を実行し、その後 `/login` を実行してください。"
+            case .korean: return "터미널에서 `codex`를 실행한 다음 `/login`을 실행하세요."
+            case .chineseSimplified: return "在终端运行 `codex`，然后执行 `/login`。"
+            }
+        case (_, .error):
+            return nil
+        default:
+            return nil
+        }
+    }
+}

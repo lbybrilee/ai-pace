@@ -1,0 +1,496 @@
+import AppKit
+import SwiftUI
+
+// MARK: - Main Popover
+
+struct MenuContentView: View {
+    @ObservedObject var store: UsageStore
+    @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
+    @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
+    @Environment(\.openWindow) private var openWindow
+
+    private var theme: AppTheme { AppTheme.find(selectedThemeID) }
+    private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
+    private var loc: Loc { Loc(lang: lang) }
+
+    var body: some View {
+        let visibleSnapshots = store.visibleSnapshots
+
+        VStack(spacing: 0) {
+            // Header
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Image(systemName: "flask.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.tertiary)
+                Text(loc.usage)
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 14)
+
+            // Provider cards
+            VStack(spacing: 8) {
+                if visibleSnapshots.isEmpty {
+                    EmptyAgentsCard(loc: loc, openSettings: {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openWindow(id: "settings")
+                    })
+                } else {
+                    ForEach(visibleSnapshots, id: \.provider.rawValue) { snapshot in
+                        ProviderCard(
+                            snapshot: snapshot,
+                            store: store,
+                            accent: accent(for: snapshot.provider),
+                            lang: lang
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+
+            // Footer
+            HStack {
+                if let ts = store.lastUpdated {
+                    Text(ts.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+                HStack(spacing: 12) {
+                    footerMenu(icon: "paintpalette") {
+                        ForEach(AppTheme.all) { t in
+                            Button {
+                                selectedThemeID = t.id
+                            } label: {
+                                if t.id == selectedThemeID {
+                                    Label(t.name, systemImage: "checkmark")
+                                } else {
+                                    Text(t.name)
+                                }
+                            }
+                        }
+                    }
+
+                    footerButton(icon: "gearshape") {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openWindow(id: "settings")
+                    }
+
+                    footerButton(icon: "arrow.clockwise", dimmed: store.isRefreshing) {
+                        Task { await store.refresh() }
+                    }
+                    .disabled(store.isRefreshing)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            .padding(.bottom, 14)
+        }
+        .frame(width: 440)
+    }
+
+    private func accent(for provider: ProviderKind) -> Color {
+        switch provider {
+        case .claude:
+            return theme.claudeAccent
+        case .codex:
+            return theme.codexAccent
+        }
+    }
+
+    // MARK: Footer Helpers
+
+    private func footerButton(icon: String, dimmed: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(dimmed ? .tertiary : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func footerMenu<Content: View>(icon: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        Menu { content() } label: {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+    }
+}
+
+private struct EmptyAgentsCard: View {
+    let loc: Loc
+    let openSettings: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(loc.noAgentsMessage)
+                .font(.system(size: 14, weight: .semibold))
+            Text(loc.noAgentsHint)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button(loc.openSettings, action: openSettings)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
+    }
+}
+
+// MARK: - Provider Card
+
+private struct ProviderCard: View {
+    let snapshot: ProviderSnapshot
+    @ObservedObject var store: UsageStore
+    let accent: Color
+    let lang: AppLanguage
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            let insight = WeeklyPacingInsight(window: snapshot.weekly, lang: lang)
+
+            // Provider header
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Circle()
+                    .fill(accent)
+                    .frame(width: 7, height: 7)
+                    .offset(y: -0.5)
+                Text(snapshot.provider.rawValue)
+                    .font(.system(size: 15, weight: .semibold))
+                if let insight {
+                    FlashingDot(color: insight.color)
+                        .offset(y: -0.5)
+                    Text(insight.message)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(insight.color)
+                        .lineLimit(1)
+                }
+                Spacer()
+                if let detail = snapshot.detail {
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Usage rows
+            UsageRow(window: snapshot.fiveHour, provider: snapshot.provider, store: store, accent: accent, lang: lang)
+            UsageRow(window: snapshot.weekly, provider: snapshot.provider, store: store, accent: accent, lang: lang)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.06))
+        )
+    }
+}
+
+// MARK: - Weekly Pacing Insight
+
+private struct WeeklyPacingInsight {
+    let message: String
+    let color: Color
+
+    init?(window: UsageWindow, lang: AppLanguage, now: Date = .now) {
+        guard window.kind == .weekly,
+              let used = window.usedPercentage,
+              let resetsAt = window.resetsAt else {
+            return nil
+        }
+
+        let totalWeeklyWindow: TimeInterval = 7 * 24 * 60 * 60
+        let timeRemaining = min(max(resetsAt.timeIntervalSince(now) / totalWeeklyWindow * 100, 0), 100)
+        let usageRemaining = min(max(100 - used, 0), 100)
+        let delta = usageRemaining - timeRemaining
+
+        message = Loc(lang: lang).insightMessage(delta: delta)
+
+        switch delta {
+        case ..<(-5): color = .orange
+        case -5...5: color = .green
+        default: color = .blue
+        }
+    }
+}
+
+// MARK: - Usage Row (Two-Tier Layout)
+
+private struct UsageRow: View {
+    let window: UsageWindow
+    let provider: ProviderKind
+    @ObservedObject var store: UsageStore
+    let accent: Color
+    let lang: AppLanguage
+
+    private var key: UsageWindowKey { UsageWindowKey(provider: provider, kind: window.kind) }
+    private var notifyEnabled: Bool { store.refreshNotificationsEnabled(for: key) }
+    private var loc: Loc { Loc(lang: lang) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            // Top tier: stats
+            HStack(spacing: 6) {
+                Button {
+                    Task { await store.setRefreshNotificationsEnabled(!notifyEnabled, for: key) }
+                } label: {
+                    Image(systemName: notifyEnabled ? "bell.fill" : "bell")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(notifyEnabled ? .primary : .tertiary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Text(loc.windowLabel(window.kind))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Group {
+                    if let used = window.usedPercentage {
+                        Text("\(Int(used.rounded()))%")
+                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    } else {
+                        Text(loc.displayMessage(window.message))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(minWidth: 36, alignment: .trailing)
+
+                Group {
+                    if let resetsAt = window.resetsAt {
+                        Text(formatReset(resetsAt))
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(width: 86, alignment: .trailing)
+            }
+
+            // Bottom tier: full-width bar
+            UsageBar(percentage: window.usedPercentage, accent: accent)
+        }
+    }
+
+    private func formatReset(_ date: Date) -> String {
+        let secs = max(0, Int(date.timeIntervalSinceNow.rounded(.down)))
+        if secs < 60 { return "<1m" }
+        let tot = secs / 60
+        let d = tot / 1440
+        let h = (tot % 1440) / 60
+        let m = tot % 60
+        var p: [String] = []
+        if d > 0 { p.append("\(d)d") }
+        if h > 0 || d > 0 { p.append("\(h)h") }
+        p.append(String(format: "%02dm", m))
+        return p.joined(separator: " ")
+    }
+}
+
+private struct FlashingDot: View {
+    let color: Color
+    @State private var isDimmed = false
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 6, height: 6)
+            .opacity(isDimmed ? 0.25 : 1.0)
+            .scaleEffect(isDimmed ? 0.8 : 1.0)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) {
+                    isDimmed = true
+                }
+            }
+    }
+}
+
+// MARK: - Custom Progress Bar
+
+private struct UsageBar: View {
+    let percentage: Double?
+    let accent: Color
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.12))
+                if let pct = percentage {
+                    Capsule()
+                        .fill(accent.opacity(barOpacity(for: pct)))
+                        .frame(width: max(2, geo.size.width * min(max(pct, 0), 100) / 100))
+                }
+            }
+        }
+        .frame(height: 5)
+    }
+
+    private func barOpacity(for pct: Double) -> Double {
+        colorScheme == .dark ? (pct > 80 ? 1.0 : pct > 60 ? 0.85 : 0.75) : 1.0
+    }
+}
+
+// MARK: - Settings
+
+struct SettingsView: View {
+    @ObservedObject var store: UsageStore
+    @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
+
+    private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
+    private var loc: Loc { Loc(lang: lang) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingsCard {
+                settingRow(loc.language) {
+                    Picker("", selection: $langID) {
+                        ForEach(AppLanguage.allCases) { l in
+                            Text(l.displayName).tag(l.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .frame(width: 180)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    settingRow(loc.autoRefresh) {
+                        Picker("", selection: Binding(
+                            get: { store.autoRefreshInterval },
+                            set: { store.setAutoRefreshInterval($0) }
+                        )) {
+                            ForEach(AutoRefreshInterval.allCases) { interval in
+                                Text(loc.refreshLabel(interval)).tag(interval)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 180)
+                    }
+
+                    Text(loc.autoRefreshDesc)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 136)
+                }
+            }
+
+            settingsCard(title: loc.agents) {
+                AgentStatusRow(status: store.agentStatus(for: .claude))
+
+                Divider()
+
+                AgentStatusRow(status: store.agentStatus(for: .codex))
+            }
+
+            settingsCard(title: loc.notifications) {
+                Text(loc.notificationsDesc)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(20)
+        .frame(width: 500)
+    }
+
+    private func settingsCard<Content: View>(title: String? = nil, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+
+            content()
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.05))
+        )
+    }
+
+    private func settingRow<Content: View>(_ title: String, @ViewBuilder control: () -> Content) -> some View {
+        HStack(alignment: .center) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 120, alignment: .leading)
+            Spacer(minLength: 20)
+            control()
+        }
+    }
+}
+
+private struct AgentStatusRow: View {
+    let status: AgentStatus
+    @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
+
+    private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
+    private var loc: Loc { Loc(lang: lang) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(status.provider.rawValue)
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(loc.statusTitle(status))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(statusColor)
+            }
+
+            if let message = status.message, case .error = status.availability {
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let instruction = loc.statusInstruction(status) {
+                Text(instruction)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var statusColor: Color {
+        switch status.availability {
+        case .available:
+            return .green
+        case .loading:
+            return .secondary
+        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn:
+            return .orange
+        case .error:
+            return .red
+        }
+    }
+}
