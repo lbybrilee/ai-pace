@@ -40,8 +40,12 @@ AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` u
 <p align="center">
   <img src="docs/images/image.png" alt="AIPace menu bar usage display" width="320">
   <img src="docs/images/image-v1.png" alt="AIPace menu bar insight display" width="320">
+  <img width="500"  src="https://github.com/user-attachments/assets/bce435bb-f0d2-4dc7-9d6f-33cbdb223eb9" />
 </p>
-<p align="center"><em>Menu bar display modes: usage percentages and pacing insight.</em></p>
+<p align="center"><em>Menu bar display modes: usage percentages and pacing insight, or both.</em></p>
+
+
+
 
 ## What You'll Need
 
