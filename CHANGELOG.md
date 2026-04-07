@@ -6,6 +6,11 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-07
+
+### Added
+- Menu bar display mode that shows both usage percentages and pacing insight in the status item
+
 ## [1.0.1] - 2026-04-07
 
 ### Added

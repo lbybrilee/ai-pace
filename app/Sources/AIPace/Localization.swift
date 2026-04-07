@@ -593,6 +593,16 @@ struct Loc {
             case .korean: return "인사이트 +/-%"
             case .chineseSimplified: return "洞察 +/-%"
             }
+        case .usageAndInsight:
+            switch lang {
+            case .english: return "Usage % + Insight"
+            case .spanish: return "Uso % + ritmo"
+            case .french: return "Utilisation % + tendance"
+            case .german: return "Nutzung % + Tendenz"
+            case .japanese: return "使用率 % + インサイト"
+            case .korean: return "사용률 % + 인사이트"
+            case .chineseSimplified: return "用量 % + 洞察"
+            }
         }
     }
 
