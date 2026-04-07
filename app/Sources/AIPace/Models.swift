@@ -1,8 +1,11 @@
 import Foundation
 
-enum ProviderKind: String {
+enum ProviderKind: String, CaseIterable, Identifiable {
     case claude = "Claude"
     case codex = "Codex"
+    case copilot = "Copilot"
+
+    var id: String { rawValue }
 }
 
 enum UsageWindowKind: String {
@@ -42,6 +45,25 @@ enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case usageAndInsight
 
     var id: String { rawValue }
+}
+
+enum UsagePerspective: String, CaseIterable, Identifiable {
+    case used
+    case remaining
+
+    var id: String { rawValue }
+
+    static let defaultValue: UsagePerspective = .used
+}
+
+enum CopilotDisplayMode: String, CaseIterable, Identifiable {
+    case usage
+    case percentage
+    case both
+
+    var id: String { rawValue }
+
+    static let defaultValue: CopilotDisplayMode = .usage
 }
 
 enum AutoRefreshInterval: Int, CaseIterable, Identifiable {
@@ -152,6 +174,90 @@ struct ProviderSnapshot {
             fiveHour: .placeholder(.fiveHour),
             weekly: .placeholder(.weekly),
             detail: nil
+        )
+    }
+}
+
+enum CopilotUsageWindowKind: String {
+    case premiumRequests = "Premium requests"
+    case today = "Today"
+    case month = "Month"
+}
+
+struct CopilotUsageWindow: Identifiable {
+    let kind: CopilotUsageWindowKind
+    var valueText: String?
+    var progressPercent: Double?
+    var resetsAt: Date?
+    var message: String?
+
+    var id: String { kind.rawValue }
+
+    static func placeholder(_ kind: CopilotUsageWindowKind, message: String = "Loading…") -> CopilotUsageWindow {
+        CopilotUsageWindow(kind: kind, valueText: nil, progressPercent: nil, resetsAt: nil, message: message)
+    }
+
+    func displayedValueText(perspective: UsagePerspective, monthlyAllowance: Int) -> String? {
+        if let progressPercent {
+            switch kind {
+            case .premiumRequests:
+                let value = perspective == .used ? progressPercent : max(0, 100 - progressPercent)
+                return String(format: "%.1f%%", value)
+            case .month:
+                let used = Int((Double(monthlyAllowance) * min(max(progressPercent, 0), 100) / 100).rounded())
+                let value = perspective == .used ? used : max(0, monthlyAllowance - used)
+                return "~\(value)/\(monthlyAllowance)"
+            case .today:
+                break
+            }
+        }
+
+        guard let valueText else {
+            return nil
+        }
+
+        switch kind {
+        case .premiumRequests, .month:
+            guard let numericValue = Self.usageCount(in: valueText) else {
+                return valueText
+            }
+            let value = perspective == .used ? numericValue : max(0, monthlyAllowance - numericValue)
+            return String(value)
+        case .today:
+            return valueText
+        }
+    }
+
+    private static func usageCount(in text: String) -> Int? {
+        if let fractionStart = text.firstIndex(of: "/") {
+            let prefix = text[..<fractionStart]
+            let digits = prefix.filter(\.isNumber)
+            if !digits.isEmpty {
+                return Int(String(digits))
+            }
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let digits = trimmed.prefix { $0.isNumber }
+        guard !digits.isEmpty else {
+            return nil
+        }
+        return Int(digits)
+    }
+}
+
+struct CopilotSnapshot {
+    var primary: CopilotUsageWindow
+    var secondary: CopilotUsageWindow?
+    var detail: String?
+    var footer: String?
+
+    static func loading() -> CopilotSnapshot {
+        CopilotSnapshot(
+            primary: .placeholder(.premiumRequests),
+            secondary: nil,
+            detail: nil,
+            footer: nil
         )
     }
 }

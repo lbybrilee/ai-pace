@@ -70,6 +70,57 @@ struct ProbeStub: ProviderSnapshotFetching {
     }
 }
 
+actor CopilotProbeQueue {
+    private var snapshots: [CopilotSnapshot]
+
+    init(_ snapshots: [CopilotSnapshot]) {
+        precondition(!snapshots.isEmpty, "CopilotProbeQueue requires at least one snapshot")
+        self.snapshots = snapshots
+    }
+
+    func next() -> CopilotSnapshot {
+        if snapshots.count == 1 {
+            return snapshots[0]
+        }
+        return snapshots.removeFirst()
+    }
+}
+
+@MainActor
+final class CopilotProbeStub: CopilotSnapshotFetching {
+    let queue: CopilotProbeQueue
+
+    init(queue: CopilotProbeQueue) {
+        self.queue = queue
+    }
+
+    func fetch() async -> CopilotSnapshot {
+        await queue.next()
+    }
+}
+
+func makeCopilotSnapshot(
+    primaryKind: CopilotUsageWindowKind = .premiumRequests,
+    primaryValue: String? = nil,
+    primaryProgress: Double? = nil,
+    primaryReset: Date? = nil,
+    primaryMessage: String? = nil,
+    secondaryKind: CopilotUsageWindowKind? = nil,
+    secondaryValue: String? = nil,
+    secondaryProgress: Double? = nil,
+    secondaryReset: Date? = nil,
+    secondaryMessage: String? = nil,
+    detail: String? = nil,
+    footer: String? = nil
+) -> CopilotSnapshot {
+    CopilotSnapshot(
+        primary: CopilotUsageWindow(kind: primaryKind, valueText: primaryValue, progressPercent: primaryProgress, resetsAt: primaryReset, message: primaryMessage),
+        secondary: secondaryKind.map { CopilotUsageWindow(kind: $0, valueText: secondaryValue, progressPercent: secondaryProgress, resetsAt: secondaryReset, message: secondaryMessage) },
+        detail: detail,
+        footer: footer
+    )
+}
+
 struct CountingProbe: ProviderSnapshotFetching {
     let snapshot: ProviderSnapshot
     let counter: ProbeCounter

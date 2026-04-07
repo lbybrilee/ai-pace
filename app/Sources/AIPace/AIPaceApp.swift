@@ -2,9 +2,14 @@ import AppKit
 import SwiftUI
 
 @main
+@MainActor
 struct AIPaceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = UsageStore()
+    @StateObject private var store: UsageStore
+
+    init() {
+        _store = StateObject(wrappedValue: UsageStore())
+    }
 
     var body: some Scene {
         let _ = appDelegate.configureIfNeeded(store: store)

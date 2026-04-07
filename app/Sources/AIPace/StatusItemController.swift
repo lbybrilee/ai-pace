@@ -59,9 +59,9 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
     }
 
     private func bindStore() {
-        Publishers.CombineLatest(store.$claude, store.$codex)
+        Publishers.CombineLatest3(store.$claude, store.$codex, store.$copilot)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _, _ in
+            .sink { [weak self] _, _, _ in
                 self?.updateButtonTitle()
                 self?.updatePopoverLayout()
             }
@@ -103,18 +103,37 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
         let displayMode = MenuBarDisplayMode(
             rawValue: UserDefaults.standard.string(forKey: "menuBarDisplayMode") ?? MenuBarDisplayMode.usage.rawValue
         ) ?? .usage
-        let claudeStatus = store.agentStatus(for: .claude)
-        let codexStatus = store.agentStatus(for: .codex)
+        var pills: [StatusItemPill] = []
 
-        return StatusItemLabelView(
-            claudeText: claudeStatus.availability.showsInPopover
-                ? StatusItemFormatter.text(prefix: "Cl", snapshot: store.claude, mode: displayMode)
-                : nil,
-            codexText: codexStatus.availability.showsInPopover
-                ? StatusItemFormatter.text(prefix: "Cx", snapshot: store.codex, mode: displayMode)
-                : nil,
-            theme: resolvedTheme
-        )
+        if store.visibleProviders.contains(.claude),
+           store.agentStatus(for: .claude).availability.showsInPopover {
+            pills.append(StatusItemPill(
+                text: StatusItemFormatter.text(prefix: "Cl", snapshot: store.claude, mode: displayMode, perspective: store.usagePerspective),
+                color: resolvedTheme.claudeAccent
+            ))
+        }
+        if store.visibleProviders.contains(.codex),
+           store.agentStatus(for: .codex).availability.showsInPopover {
+            pills.append(StatusItemPill(
+                text: StatusItemFormatter.text(prefix: "Cx", snapshot: store.codex, mode: displayMode, perspective: store.usagePerspective),
+                color: resolvedTheme.codexAccent
+            ))
+        }
+        if store.visibleProviders.contains(.copilot),
+           store.agentStatus(for: .copilot).availability.showsInPopover {
+            pills.append(StatusItemPill(
+                text: StatusItemFormatter.text(
+                    prefix: "Cp",
+                    snapshot: store.copilot,
+                    mode: store.copilotDisplayMode,
+                    perspective: store.usagePerspective,
+                    monthlyAllowance: store.copilotMonthlyAllowance
+                ),
+                color: resolvedTheme.copilotAccent
+            ))
+        }
+
+        return StatusItemLabelView(pills: pills)
     }
 
     private func updatePopoverLayout() {
@@ -142,7 +161,7 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
     }
 
     private func popoverHeight() -> CGFloat {
-        Self.popoverHeight(forVisibleSnapshotCount: store.visibleSnapshots.count)
+        Self.popoverHeight(forVisibleSnapshotCount: store.visibleCardCount)
     }
 
     static func popoverHeight(forVisibleSnapshotCount count: Int) -> CGFloat {
@@ -151,8 +170,10 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
             return 220
         case 1:
             return 250
-        default:
+        case 2:
             return 380
+        default:
+            return 500
         }
     }
 

@@ -38,9 +38,69 @@ struct LocalizationAndFormattingTests {
         )
 
         #expect(AppTheme.find("missing-theme").id == AppTheme.defaultTheme.id)
-        #expect(StatusItemFormatter.text(prefix: "Cl", snapshot: snapshot, mode: .usage) == "Cl 12/77")
-        #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .insight) == "Cx +10%")
-        #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .usageAndInsight) == "Cx 5/40 +10%")
+        #expect(StatusItemFormatter.text(prefix: "Cl", snapshot: snapshot, mode: .usage, perspective: .used) == "Cl 12/77")
+        #expect(StatusItemFormatter.text(prefix: "Cl", snapshot: snapshot, mode: .usage, perspective: .remaining) == "Cl 88/23")
+        #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .insight, perspective: .used) == "Cx +10%")
+        #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .usageAndInsight, perspective: .used) == "Cx 5/40 +10%")
+        #expect(
+            StatusItemFormatter.text(
+                prefix: "Cp",
+                snapshot: makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "7.4%",
+                    primaryProgress: 7.4,
+                    secondaryKind: .month,
+                    secondaryValue: "~22/300"
+                ),
+                mode: .usage,
+                perspective: .used,
+                monthlyAllowance: 300
+            ) == "Cp ~22/300"
+        )
+        #expect(
+            StatusItemFormatter.text(
+                prefix: "Cp",
+                snapshot: makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "7.4%",
+                    primaryProgress: 7.4,
+                    secondaryKind: .month,
+                    secondaryValue: "~22/300"
+                ),
+                mode: .percentage,
+                perspective: .remaining,
+                monthlyAllowance: 300
+            ) == "Cp 92.6%"
+        )
+        #expect(
+            StatusItemFormatter.text(
+                prefix: "Cp",
+                snapshot: makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "7.4%",
+                    primaryProgress: 7.4,
+                    secondaryKind: .month,
+                    secondaryValue: "~22/300"
+                ),
+                mode: .usage,
+                perspective: .remaining,
+                monthlyAllowance: 300
+            ) == "Cp ~278/300"
+        )
+        #expect(
+            StatusItemFormatter.text(
+                prefix: "Cp",
+                snapshot: makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "22",
+                    secondaryKind: .today,
+                    secondaryValue: "4"
+                ),
+                mode: .usage,
+                perspective: .remaining,
+                monthlyAllowance: 300
+            ) == "Cp 278"
+        )
     }
 
     @Test

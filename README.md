@@ -6,7 +6,7 @@
 
 **A macOS menu bar app that shows your AI usage.**
 
-AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` usage for Claude and Codex on your Mac. It uses your existing CLI login, so there is nothing extra to sign in to.
+AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` usage for Claude and Codex, plus your GitHub Copilot usage from the GitHub settings page, on your Mac.
 
 > This project is unofficial and is not affiliated with, endorsed by, or maintained by Anthropic or OpenAI.
 
@@ -14,6 +14,7 @@ AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` u
 
 - 🧪 Menu bar app built with SwiftUI
 - 📊 Claude and Codex `5h` and `weekly` usage in one place
+- 🧾 GitHub Copilot usage from the GitHub settings page, with billing API counts when available
 - 🔐 Uses your existing local CLI login
 - 🔔 Optional notifications when a usage window refreshes
 - ⏱️ Refreshes every 5 minutes by default
@@ -53,6 +54,7 @@ AIPace is a lightweight menu bar app that shows your current `5h` and `weekly` u
 - Xcode with Swift 6.2 support, or a Swift 6.2 toolchain
 - `claude` installed and logged in (for Claude usage)
 - `codex` installed and logged in (for Codex usage)
+- GitHub sign-in in the app for Copilot usage
 
 ## How It Works
 
@@ -77,13 +79,19 @@ It also reads `~/.claude.json -> oauthAccount` for display info only.
 
 AIPace uses `codex app-server` with your existing Codex login. It launches from your home directory so you do not get workspace trust prompts.
 
+### GitHub Copilot
+
+AIPace opens the GitHub Copilot settings page inside the app and reads the usage shown there.
+
+If you already have a saved GitHub token with `plan:read`, AIPace tries the billing API first so it can show request counts. If that API is unavailable for your account, the app falls back to the settings page view.
+
 ## Privacy & Security
 
 - **No telemetry**: nothing is tracked
 - **No backend**: there is no proxy or app server
 - **Local only**: credentials come from your existing CLI auth state
 - **Direct connections**: requests go from your Mac to provider endpoints
-- **No syncing**: tokens stay on your machine
+- **No syncing**: any saved tokens stay on your machine
 
 This app depends on local auth state and provider APIs that can change. If you use it in a security-sensitive environment, review the code first.
 
@@ -121,6 +129,7 @@ After launch, look for the Claude and Codex stats in your menu bar.
 | Claude unavailable | Make sure `claude` is installed and logged in, or set `CLAUDE_CODE_OAUTH_TOKEN` |
 | Claude Keychain prompt | Expected if your credentials are stored in Keychain — just approve it |
 | Codex unavailable | Check that the `codex` CLI is installed, on your `PATH`, and logged in |
+| Copilot unavailable | Open Settings, click `Sign In to GitHub`, and complete the GitHub login flow in the app |
 | Codex works in Terminal but not from Xcode | Xcode-launched apps often inherit a different `PATH`; AIPace now augments `PATH` with your login shell and common macOS install directories |
 | Usage stuck on loading | Try the refresh button, then relaunch the app so it picks up your current shell environment |
 | Local build fails | Make sure your Xcode version supports `swift-tools-version: 6.2`, or use a Swift 6.2 toolchain |

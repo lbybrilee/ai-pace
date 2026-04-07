@@ -19,11 +19,40 @@ struct CodexProbeTests {
         let window = probe.parseWindow([
             "usedPercent": "62.5",
             "resetsAt": 1_710_000_000,
+            "windowDurationMins": 240,
         ])
 
         #expect(window?.usedPercent == 62.5)
         #expect(window?.resetsAt == Date(timeIntervalSince1970: 1_710_000_000))
+        #expect(window?.windowDurationMins == 240)
         #expect(probe.parseWindow(["resetsAt": 1_710_000_000]) == nil)
+    }
+
+    @Test
+    func preferredRateLimitSnapshotPrefersCodexBucket() {
+        let probe = CodexProbe()
+        let result: [String: Any] = [
+            "rateLimits": ["planType": "plus"],
+            "rateLimitsByLimitId": [
+                "other": ["planType": "go"],
+                "codex": ["planType": "pro"],
+            ],
+        ]
+
+        let snapshot = probe.preferredRateLimitSnapshot(from: result)
+
+        #expect(snapshot?["planType"] as? String == "pro")
+    }
+
+    @Test
+    func detailTextUsesActualWindowDurations() {
+        let probe = CodexProbe()
+        let shortWindow = CodexRateLimitWindow(usedPercent: 12, resetsAt: nil, windowDurationMins: 240)
+        let longWindow = CodexRateLimitWindow(usedPercent: 48, resetsAt: nil, windowDurationMins: 10_080)
+
+        #expect(
+            probe.detailText(planType: "pro", shortWindow: shortWindow, longWindow: longWindow) == "Plan: pro · 4h / 7d"
+        )
     }
 
     @Test

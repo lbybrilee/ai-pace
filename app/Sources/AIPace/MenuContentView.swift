@@ -10,6 +10,7 @@ struct MenuContentView: View {
     @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
     @AppStorage(AppTheme.customClaudeAccentDefaultsKey) private var customClaudeAccentHex = ""
     @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
+    @AppStorage(AppTheme.customCopilotAccentDefaultsKey) private var customCopilotAccentHex = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
@@ -17,7 +18,8 @@ struct MenuContentView: View {
         AppTheme.resolvedTheme(
             themeID: selectedThemeID,
             customClaudeAccentHex: customClaudeAccentHex,
-            customCodexAccentHex: customCodexAccentHex
+            customCodexAccentHex: customCodexAccentHex,
+            customCopilotAccentHex: customCopilotAccentHex
         )
     }
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
@@ -42,16 +44,29 @@ struct MenuContentView: View {
             // Provider cards
             VStack(spacing: 8) {
                 if visibleSnapshots.isEmpty {
-                    EmptyAgentsCard(loc: loc, openSettings: openSettings)
-                } else {
-                    ForEach(visibleSnapshots, id: \.provider.rawValue) { snapshot in
-                        ProviderCard(
-                            snapshot: snapshot,
-                            store: store,
-                            accent: accent(for: snapshot.provider),
-                            lang: lang
-                        )
+                    if !store.showsCopilotCard {
+                        EmptyAgentsCard(loc: loc, openSettings: openSettings)
                     }
+                }
+
+                ForEach(visibleSnapshots, id: \.provider.rawValue) { snapshot in
+                    ProviderCard(
+                        snapshot: snapshot,
+                        store: store,
+                        accent: accent(for: snapshot.provider),
+                        lang: lang
+                    )
+                }
+
+                if store.showsCopilotCard {
+                    CopilotCard(
+                        snapshot: store.copilot,
+                        accent: theme.copilotAccent,
+                        lang: lang,
+                        displayMode: store.copilotDisplayMode,
+                        perspective: store.usagePerspective,
+                        monthlyAllowance: store.copilotMonthlyAllowance
+                    )
                 }
             }
             .padding(.horizontal, 20)
@@ -59,7 +74,7 @@ struct MenuContentView: View {
             // Footer
             HStack {
                 if let ts = store.lastUpdated {
-                    Text(ts.formatted(date: .omitted, time: .shortened))
+                    Text("\(loc.lastUpdated) \(ts.formatted(date: .omitted, time: .standard))")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.tertiary)
                 }
@@ -83,9 +98,20 @@ struct MenuContentView: View {
                         openSettings()
                     }
 
-                    footerButton(icon: "arrow.clockwise", dimmed: store.isRefreshing) {
+                    Button {
                         Task { await store.refresh() }
                     }
+                    label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .medium))
+                            Text(store.isRefreshing ? loc.refreshing : loc.refreshNow)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundStyle(store.isRefreshing ? .tertiary : .secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .pointerOnHover()
                     .disabled(store.isRefreshing)
                 }
             }
@@ -109,6 +135,8 @@ struct MenuContentView: View {
             return theme.claudeAccent
         case .codex:
             return theme.codexAccent
+        case .copilot:
+            return theme.copilotAccent
         }
     }
 
@@ -214,6 +242,77 @@ private struct ProviderCard: View {
     }
 }
 
+private struct CopilotCard: View {
+    let snapshot: CopilotSnapshot
+    let accent: Color
+    let lang: AppLanguage
+    let displayMode: CopilotDisplayMode
+    let perspective: UsagePerspective
+    let monthlyAllowance: Int
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var loc: Loc { Loc(lang: lang) }
+    private var visibleWindows: [CopilotUsageWindow] {
+        if snapshot.primary.kind == .premiumRequests {
+            switch displayMode {
+            case .usage:
+                return [snapshot.secondary ?? snapshot.primary]
+            case .percentage:
+                return [snapshot.primary]
+            case .both:
+                if let secondary = snapshot.secondary {
+                    return [secondary, snapshot.primary]
+                }
+                return [snapshot.primary]
+            }
+        }
+
+        return [snapshot.primary, snapshot.secondary].compactMap { $0 }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Circle()
+                    .fill(accent)
+                    .frame(width: 7, height: 7)
+                    .offset(y: -0.5)
+                Text(ProviderKind.copilot.rawValue)
+                    .font(.system(size: 15, weight: .semibold))
+                Spacer()
+                if let detail = snapshot.detail {
+                    Text(detail)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            ForEach(visibleWindows) { window in
+                CopilotUsageRow(
+                    window: window,
+                    accent: accent,
+                    lang: lang,
+                    perspective: perspective,
+                    monthlyAllowance: monthlyAllowance
+                )
+            }
+            if let footer = snapshot.footer {
+                Text(footer)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.06))
+        )
+        .accessibilityLabel(loc.copilotUsage)
+    }
+}
+
 // MARK: - Weekly Pacing Insight
 
 private struct WeeklyPacingInsight {
@@ -281,7 +380,7 @@ private struct UsageRow: View {
 
                 Group {
                     if let used = window.usedPercentage {
-                        Text("\(Int(used.rounded()))%")
+                        Text(displayedPercentText(from: used))
                             .font(.system(size: 14, weight: .medium, design: .monospaced))
                     } else {
                         Text(loc.displayMessage(window.message))
@@ -319,6 +418,11 @@ private struct UsageRow: View {
         if h > 0 || d > 0 { p.append("\(h)h") }
         p.append(String(format: "%02dm", m))
         return p.joined(separator: " ")
+    }
+
+    private func displayedPercentText(from used: Double) -> String {
+        let value = store.usagePerspective == .used ? used : max(0, 100 - used)
+        return "\(Int(value.rounded()))%"
     }
 }
 
@@ -367,6 +471,56 @@ private struct UsageBar: View {
     }
 }
 
+private struct CopilotUsageRow: View {
+    let window: CopilotUsageWindow
+    let accent: Color
+    let lang: AppLanguage
+    let perspective: UsagePerspective
+    let monthlyAllowance: Int
+
+    private var loc: Loc { Loc(lang: lang) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(accent.opacity(0.9))
+                    .frame(width: 6, height: 6)
+                Text(loc.copilotWindowLabel(window.kind))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if let valueText = displayedValueText {
+                    Text(valueText)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                } else {
+                    Text(loc.displayMessage(window.message))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
+                }
+                if let resetsAt = window.resetsAt {
+                    Text(formatResetDate(resetsAt))
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 54, alignment: .trailing)
+                }
+            }
+            if let progress = window.progressPercent {
+                UsageBar(percentage: progress, accent: accent)
+                    .padding(.leading, 16)
+            }
+        }
+    }
+
+    private func formatResetDate(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day())
+    }
+
+    private var displayedValueText: String? {
+        window.displayedValueText(perspective: perspective, monthlyAllowance: monthlyAllowance)
+    }
+}
+
 // MARK: - Settings
 
 struct SettingsView: View {
@@ -374,6 +528,7 @@ struct SettingsView: View {
     @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
     @AppStorage(AppTheme.customClaudeAccentDefaultsKey) private var customClaudeAccentHex = ""
     @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
+    @AppStorage(AppTheme.customCopilotAccentDefaultsKey) private var customCopilotAccentHex = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
 
@@ -436,6 +591,22 @@ struct SettingsView: View {
                         .foregroundStyle(.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.leading, 136)
+
+                    Divider()
+
+                    settingRow(loc.usagePerspective) {
+                        Picker("", selection: Binding(
+                            get: { store.usagePerspective },
+                            set: { store.setUsagePerspective($0) }
+                        )) {
+                            ForEach(UsagePerspective.allCases) { perspective in
+                                Text(loc.usagePerspectiveLabel(perspective)).tag(perspective)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 180)
+                    }
                 }
 
                 Divider()
@@ -450,6 +621,31 @@ struct SettingsView: View {
                     .labelsHidden()
                     .frame(width: 180)
                 }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    settingRow(loc.providers) {
+                        HStack(spacing: 12) {
+                            ForEach(ProviderKind.allCases) { provider in
+                                Toggle(
+                                    provider.rawValue,
+                                    isOn: Binding(
+                                        get: { store.visibleProviders.contains(provider) },
+                                        set: { store.setProviderVisibilityEnabled($0, for: provider) }
+                                    )
+                                )
+                                .toggleStyle(.checkbox)
+                            }
+                        }
+                    }
+
+                    Text(loc.providerVisibilityDesc)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 136)
+                }
             }
 
             settingsCard(title: loc.agents) {
@@ -458,6 +654,10 @@ struct SettingsView: View {
                 Divider()
 
                 AgentStatusRow(status: store.agentStatus(for: .codex))
+
+                Divider()
+
+                CopilotAgentSettings(store: store, loc: loc)
             }
 
             settingsCard(title: loc.notifications) {
@@ -539,6 +739,16 @@ struct SettingsView: View {
                     AccentColorControl(
                         hexValue: $customCodexAccentHex,
                         fallbackColor: baseTheme.codexAccent,
+                        resetLabel: loc.reset
+                    )
+                }
+
+                Divider()
+
+                settingRow(loc.copilotColor) {
+                    AccentColorControl(
+                        hexValue: $customCopilotAccentHex,
+                        fallbackColor: baseTheme.copilotAccent,
                         resetLabel: loc.reset
                     )
                 }
@@ -749,5 +959,83 @@ private struct AgentStatusRow: View {
         case .error:
             return .red
         }
+    }
+}
+
+private struct CopilotAgentSettings: View {
+    @ObservedObject var store: UsageStore
+    let loc: Loc
+    @State private var allowanceDraft = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AgentStatusRow(status: store.agentStatus(for: .copilot))
+
+            Button(loc.openGitHubLoginWindow) {
+                store.openCopilotLogin()
+            }
+            .buttonStyle(.borderedProminent)
+            .pointerOnHover()
+
+            HStack(spacing: 10) {
+                Text(loc.copilotMonthlyAllowance)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 120, alignment: .leading)
+
+                TextField("", text: $allowanceDraft)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                    .frame(width: 84)
+                    .onSubmit(commitAllowance)
+                    .onChange(of: store.copilotMonthlyAllowance) { _, _ in
+                        syncAllowanceDraft()
+                    }
+            }
+
+            HStack(spacing: 10) {
+                Text(loc.copilotDisplay)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 120, alignment: .leading)
+
+                Picker("", selection: Binding(
+                    get: { store.copilotDisplayMode },
+                    set: { store.setCopilotDisplayMode($0) }
+                )) {
+                    ForEach(CopilotDisplayMode.allCases) { mode in
+                        Text(loc.copilotDisplayModeLabel(mode)).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 160)
+            }
+
+            Text(loc.copilotSettingsDesc)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(loc.copilotMonthlyAllowanceDesc)
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear(perform: syncAllowanceDraft)
+    }
+
+    private func commitAllowance() {
+        let trimmed = allowanceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let value = Int(trimmed), value > 0 else {
+            syncAllowanceDraft()
+            return
+        }
+        store.setCopilotMonthlyAllowance(value)
+        syncAllowanceDraft()
+    }
+
+    private func syncAllowanceDraft() {
+        allowanceDraft = String(store.copilotMonthlyAllowance)
     }
 }

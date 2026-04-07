@@ -13,18 +13,147 @@ struct UsageStoreTests {
         let store = UsageStore(
             claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
             codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            copilotProbe: CopilotProbeStub(queue: CopilotProbeQueue([CopilotSnapshot.loading()])),
             notificationManager: NotificationManagerSpy(),
             userDefaults: defaults,
             startRefreshLoop: false
         )
         store.claude = makeSnapshot(.claude, fiveHourUsed: 15, weeklyUsed: 45)
         store.codex = makeSnapshot(.codex, fiveHourMessage: "Codex is not installed or not on PATH.", weeklyMessage: "Codex is not installed or not on PATH.")
+        store.copilot = makeCopilotSnapshot(
+            primaryKind: .month,
+            primaryValue: "17",
+            secondaryKind: .today,
+            secondaryValue: "2",
+            detail: "octocat"
+        )
 
         #expect(store.agentStatus(for: ProviderKind.claude).availability == AgentAvailability.available)
         #expect(store.agentStatus(for: ProviderKind.codex).availability == AgentAvailability.notInstalled)
+        #expect(store.agentStatus(for: ProviderKind.copilot).availability == AgentAvailability.available)
         #expect(store.visibleSnapshots.map { $0.provider } == [ProviderKind.claude])
+        #expect(store.showsCopilotCard)
+        #expect(store.visibleCardCount == 2)
         #expect(store.hasVisibleSnapshots)
         #expect(store.menuBarTitle == "Cl 15/45  Cx --/--")
+
+        store.setProviderVisibilityEnabled(false, for: .claude)
+
+        #expect(store.visibleSnapshots.isEmpty)
+        #expect(store.showsCopilotCard)
+        #expect(store.visibleCardCount == 1)
+    }
+
+    @Test
+    @MainActor
+    func copilotStatusTracksSavedAndClearedToken() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        actor TokenBox {
+            var token: String?
+
+            func setToken(_ token: String?) {
+                self.token = token
+            }
+
+            func value() -> String? {
+                token
+            }
+        }
+
+        let tokenBox = TokenBox()
+        let credentialStore = GitHubCopilotCredentialStore(
+            loadOverride: { nil },
+            saveOverride: { token in
+                Task { await tokenBox.setToken(token) }
+            },
+            deleteOverride: {
+                Task { await tokenBox.setToken(nil) }
+            }
+        )
+        let webSession = GitHubCopilotWebSession(
+            fetchOverride: {
+                makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "7.4%",
+                    primaryProgress: 7.4,
+                    detail: "Managed by nioer"
+                )
+            },
+            openLoginOverride: {}
+        )
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
+            codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            copilotProbe: CopilotProbeStub(queue: CopilotProbeQueue([
+                makeCopilotSnapshot(
+                    primaryKind: .month,
+                    primaryValue: "19",
+                    secondaryKind: .today,
+                    secondaryValue: "4",
+                    detail: "octocat"
+                ),
+            ])),
+            copilotCredentialStore: credentialStore,
+            copilotWebSession: webSession,
+            notificationManager: NotificationManagerSpy(),
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        store.saveCopilotToken("  test-token  ")
+        let didRefresh = await waitUntil {
+            await MainActor.run {
+                store.copilot.primary.valueText == "19" && store.copilot.secondary?.valueText == "4"
+            }
+        }
+
+        #expect(didRefresh)
+        #expect(await tokenBox.value() == "test-token")
+        #expect(store.agentStatus(for: .copilot).availability == .available)
+
+        store.clearCopilotToken()
+
+        #expect(store.copilot.primary.message == "GitHub sign in required.")
+        #expect(store.agentStatus(for: .copilot).availability == .missingAuth)
+    }
+
+    @Test
+    @MainActor
+    func copilotWebUsageEstimatesMonthlyAllowanceAndUpdatesWhenAllowanceChanges() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.claude)])),
+            codexProbe: ProbeStub(queue: ProbeQueue([ProviderSnapshot.loading(.codex)])),
+            copilotProbe: CopilotProbeStub(queue: CopilotProbeQueue([
+                makeCopilotSnapshot(
+                    primaryKind: .premiumRequests,
+                    primaryValue: "7.4%",
+                    primaryProgress: 7.4,
+                    detail: "Managed by nioer"
+                ),
+            ])),
+            notificationManager: NotificationManagerSpy(),
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        await store.refresh()
+
+        #expect(store.copilot.primary.valueText == "7.4%")
+        #expect(store.copilot.secondary?.kind == .month)
+        #expect(store.copilot.secondary?.valueText == "~22/300")
+        #expect(store.copilot.primary.resetsAt != nil)
+
+        store.setCopilotMonthlyAllowance(500)
+
+        #expect(store.copilot.secondary?.valueText == "~37/500")
     }
 
     @Test

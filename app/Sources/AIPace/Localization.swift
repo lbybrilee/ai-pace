@@ -26,6 +26,7 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
 struct Loc {
     let lang: AppLanguage
+    static let gitHubTokenSetupURLString = "https://github.com/settings/personal-access-tokens/new?name=AIPace&description=Read%20GitHub%20Copilot%20premium%20request%20usage%20for%20AIPace&expires_in=30&plan=read"
 
     var usage: String {
         switch lang {
@@ -99,6 +100,42 @@ struct Loc {
         }
     }
 
+    var copilotColor: String {
+        switch lang {
+        case .english: return "Copilot Color"
+        case .spanish: return "Color de Copilot"
+        case .french: return "Couleur de Copilot"
+        case .german: return "Copilot-Farbe"
+        case .japanese: return "Copilot の色"
+        case .korean: return "Copilot 색상"
+        case .chineseSimplified: return "Copilot 颜色"
+        }
+    }
+
+    var copilotMonthlyAllowance: String {
+        switch lang {
+        case .english: return "Monthly Allowance"
+        case .spanish: return "Límite mensual"
+        case .french: return "Quota mensuelle"
+        case .german: return "Monatslimit"
+        case .japanese: return "月間上限"
+        case .korean: return "월간 한도"
+        case .chineseSimplified: return "月度额度"
+        }
+    }
+
+    var copilotMonthlyAllowanceDesc: String {
+        switch lang {
+        case .english: return "Default is 300. When GitHub only shows a percentage, AIPace estimates monthly requests from this allowance."
+        case .spanish: return "El valor predeterminado es 300. Cuando GitHub solo muestra un porcentaje, AIPace estima las solicitudes mensuales a partir de este límite."
+        case .french: return "La valeur par défaut est 300. Lorsque GitHub n’affiche qu’un pourcentage, AIPace estime les requêtes mensuelles à partir de cette limite."
+        case .german: return "Standard ist 300. Wenn GitHub nur einen Prozentsatz zeigt, schätzt AIPace daraus die monatlichen Requests."
+        case .japanese: return "デフォルトは 300 です。GitHub が割合しか表示しない場合、AIPace はこの上限から月間リクエスト数を推定します。"
+        case .korean: return "기본값은 300입니다. GitHub가 퍼센트만 보여줄 때 AIPace가 이 한도를 기준으로 월간 요청 수를 추정합니다."
+        case .chineseSimplified: return "默认 300。GitHub 只显示百分比时，AIPace 会按这个额度估算本月请求次数。"
+        }
+    }
+
     var reset: String {
         switch lang {
         case .english: return "Reset"
@@ -120,6 +157,18 @@ struct Loc {
         case .japanese: return "自動更新"
         case .korean: return "자동 새로고침"
         case .chineseSimplified: return "自动刷新"
+        }
+    }
+
+    var usagePerspective: String {
+        switch lang {
+        case .english: return "Usage View"
+        case .spanish: return "Vista de uso"
+        case .french: return "Vue d’utilisation"
+        case .german: return "Nutzungsansicht"
+        case .japanese: return "表示基準"
+        case .korean: return "표시 기준"
+        case .chineseSimplified: return "显示视角"
         }
     }
 
@@ -183,6 +232,30 @@ struct Loc {
         }
     }
 
+    var providerVisibilityDesc: String {
+        switch lang {
+        case .english: return "Choose which providers appear in the menu bar and popover."
+        case .spanish: return "Elige qué proveedores aparecen en la barra de menús y en la ventana emergente."
+        case .french: return "Choisissez quels services apparaissent dans la barre de menus et le popover."
+        case .german: return "Wähle aus, welche Dienste in Menüleiste und Popover erscheinen."
+        case .japanese: return "メニューバーとポップオーバーに表示するプロバイダを選びます。"
+        case .korean: return "메뉴 막대와 팝오버에 표시할 제공자를 선택합니다."
+        case .chineseSimplified: return "选择哪些服务显示在菜单栏和弹窗里。"
+        }
+    }
+
+    var copilotDisplay: String {
+        switch lang {
+        case .english: return "Copilot Display"
+        case .spanish: return "Vista de Copilot"
+        case .french: return "Affichage Copilot"
+        case .german: return "Copilot-Anzeige"
+        case .japanese: return "Copilot 表示"
+        case .korean: return "Copilot 표시"
+        case .chineseSimplified: return "Copilot 显示"
+        }
+    }
+
     var agents: String {
         switch lang {
         case .english: return "Agents"
@@ -216,6 +289,133 @@ struct Loc {
         case .japanese: return "設定を開く"
         case .korean: return "설정 열기"
         case .chineseSimplified: return "打开设置"
+        }
+    }
+
+    var refreshNow: String {
+        switch lang {
+        case .english: return "Refresh"
+        case .spanish: return "Actualizar"
+        case .french: return "Actualiser"
+        case .german: return "Aktualisieren"
+        case .japanese: return "更新"
+        case .korean: return "새로고침"
+        case .chineseSimplified: return "刷新"
+        }
+    }
+
+    var refreshing: String {
+        switch lang {
+        case .english: return "Refreshing…"
+        case .spanish: return "Actualizando…"
+        case .french: return "Actualisation…"
+        case .german: return "Aktualisieren…"
+        case .japanese: return "更新中…"
+        case .korean: return "새로고침 중…"
+        case .chineseSimplified: return "刷新中…"
+        }
+    }
+
+    var lastUpdated: String {
+        switch lang {
+        case .english: return "Updated"
+        case .spanish: return "Actualizado"
+        case .french: return "Mis à jour"
+        case .german: return "Aktualisiert"
+        case .japanese: return "更新"
+        case .korean: return "업데이트"
+        case .chineseSimplified: return "更新于"
+        }
+    }
+
+    var save: String {
+        switch lang {
+        case .english: return "Save"
+        case .spanish: return "Guardar"
+        case .french: return "Enregistrer"
+        case .german: return "Speichern"
+        case .japanese: return "保存"
+        case .korean: return "저장"
+        case .chineseSimplified: return "保存"
+        }
+    }
+
+    var disconnect: String {
+        switch lang {
+        case .english: return "Disconnect"
+        case .spanish: return "Desconectar"
+        case .french: return "Déconnecter"
+        case .german: return "Trennen"
+        case .japanese: return "接続解除"
+        case .korean: return "연결 해제"
+        case .chineseSimplified: return "断开连接"
+        }
+    }
+
+    var openGitHubTokenPage: String {
+        switch lang {
+        case .english: return "Create Token"
+        case .spanish: return "Crear token"
+        case .french: return "Créer un jeton"
+        case .german: return "Token erstellen"
+        case .japanese: return "トークンを作成"
+        case .korean: return "토큰 만들기"
+        case .chineseSimplified: return "创建令牌"
+        }
+    }
+
+    var openGitHubLoginWindow: String {
+        switch lang {
+        case .english: return "Sign In to GitHub"
+        case .spanish: return "Iniciar sesión en GitHub"
+        case .french: return "Se connecter à GitHub"
+        case .german: return "Bei GitHub anmelden"
+        case .japanese: return "GitHub にサインイン"
+        case .korean: return "GitHub 로그인"
+        case .chineseSimplified: return "登录 GitHub"
+        }
+    }
+
+    var githubTokenPlaceholder: String {
+        switch lang {
+        case .english: return "Paste a GitHub fine-grained token"
+        case .spanish: return "Pega un token de GitHub de granularidad fina"
+        case .french: return "Collez un jeton GitHub à granularité fine"
+        case .german: return "Feingranulares GitHub-Token einfügen"
+        case .japanese: return "GitHub の fine-grained token を貼り付け"
+        case .korean: return "GitHub fine-grained token 붙여넣기"
+        case .chineseSimplified: return "粘贴 GitHub 细粒度令牌"
+        }
+    }
+
+    var copilotSettingsDesc: String {
+        switch lang {
+        case .english:
+            return "Sign in to GitHub in the app once, then AIPace will read the Copilot usage shown on the GitHub settings page. If you already have a saved token with `plan:read`, AIPace will try the billing API first."
+        case .spanish:
+            return "Inicia sesión en GitHub dentro de la app una vez y AIPace leerá el uso de Copilot mostrado en la página de ajustes de GitHub. Si ya tienes un token guardado con `plan:read`, AIPace intentará primero la API de facturación."
+        case .french:
+            return "Connectez-vous une fois à GitHub dans l’app, puis AIPace lira l’utilisation de Copilot affichée sur la page de réglages GitHub. Si un jeton enregistré avec `plan:read` existe déjà, AIPace essaiera d’abord l’API de facturation."
+        case .german:
+            return "Melde dich einmal in der App bei GitHub an, dann liest AIPace die Copilot-Nutzung von der GitHub-Einstellungsseite. Wenn bereits ein gespeichertes Token mit `plan:read` vorhanden ist, versucht AIPace zuerst die Billing-API."
+        case .japanese:
+            return "アプリ内で一度 GitHub にサインインすると、AIPace は GitHub 設定ページに表示される Copilot usage を読み取ります。`plan:read` 付きの保存済みトークンがある場合は、まず billing API を試します。"
+        case .korean:
+            return "앱 안에서 GitHub에 한 번 로그인하면 AIPace가 GitHub 설정 페이지에 표시되는 Copilot usage를 읽습니다. `plan:read` 권한이 있는 저장된 토큰이 있으면 먼저 billing API를 시도합니다."
+        case .chineseSimplified:
+            return "先在应用里登录一次 GitHub，之后 AIPace 会读取 GitHub 设置页展示的 Copilot usage。若本机已保存带 `plan:read` 的令牌，AIPace 会优先尝试 billing API。"
+        }
+    }
+
+    var copilotUsage: String {
+        switch lang {
+        case .english: return "GitHub Copilot usage"
+        case .spanish: return "Uso de GitHub Copilot"
+        case .french: return "Utilisation de GitHub Copilot"
+        case .german: return "GitHub Copilot-Nutzung"
+        case .japanese: return "GitHub Copilot 使用量"
+        case .korean: return "GitHub Copilot 사용량"
+        case .chineseSimplified: return "GitHub Copilot 用量"
         }
     }
 
@@ -417,6 +617,41 @@ struct Loc {
         }
     }
 
+    func copilotWindowLabel(_ kind: CopilotUsageWindowKind) -> String {
+        switch kind {
+        case .premiumRequests:
+            switch lang {
+            case .english: return "Premium"
+            case .spanish: return "Premium"
+            case .french: return "Premium"
+            case .german: return "Premium"
+            case .japanese: return "Premium"
+            case .korean: return "Premium"
+            case .chineseSimplified: return "Premium"
+            }
+        case .today:
+            switch lang {
+            case .english: return "Today"
+            case .spanish: return "Hoy"
+            case .french: return "Aujourd’hui"
+            case .german: return "Heute"
+            case .japanese: return "今日"
+            case .korean: return "오늘"
+            case .chineseSimplified: return "今日"
+            }
+        case .month:
+            switch lang {
+            case .english: return "Month"
+            case .spanish: return "Mes"
+            case .french: return "Mois"
+            case .german: return "Monat"
+            case .japanese: return "本月"
+            case .korean: return "이번 달"
+            case .chineseSimplified: return "本月"
+            }
+        }
+    }
+
     func refreshLabel(_ interval: AutoRefreshInterval) -> String {
         switch lang {
         case .english:
@@ -480,6 +715,31 @@ struct Loc {
             case .tenMinutes: return "10 分钟"
             case .fifteenMinutes: return "15 分钟"
             case .thirtyMinutes: return "30 分钟"
+            }
+        }
+    }
+
+    func usagePerspectiveLabel(_ perspective: UsagePerspective) -> String {
+        switch perspective {
+        case .used:
+            switch lang {
+            case .english: return "Used"
+            case .spanish: return "Usado"
+            case .french: return "Utilisé"
+            case .german: return "Verbraucht"
+            case .japanese: return "已使用"
+            case .korean: return "사용량"
+            case .chineseSimplified: return "已使用"
+            }
+        case .remaining:
+            switch lang {
+            case .english: return "Remaining"
+            case .spanish: return "Restante"
+            case .french: return "Restant"
+            case .german: return "Verbleibend"
+            case .japanese: return "剩余"
+            case .korean: return "남은 양"
+            case .chineseSimplified: return "剩余"
             }
         }
     }
@@ -602,6 +862,41 @@ struct Loc {
             case .japanese: return "使用率 % + インサイト"
             case .korean: return "사용률 % + 인사이트"
             case .chineseSimplified: return "用量 % + 洞察"
+            }
+        }
+    }
+
+    func copilotDisplayModeLabel(_ mode: CopilotDisplayMode) -> String {
+        switch mode {
+        case .usage:
+            switch lang {
+            case .english: return "Usage"
+            case .spanish: return "Uso"
+            case .french: return "Utilisation"
+            case .german: return "Nutzung"
+            case .japanese: return "用量"
+            case .korean: return "사용량"
+            case .chineseSimplified: return "用量"
+            }
+        case .percentage:
+            switch lang {
+            case .english: return "Percentage"
+            case .spanish: return "Porcentaje"
+            case .french: return "Pourcentage"
+            case .german: return "Prozent"
+            case .japanese: return "百分比"
+            case .korean: return "백분율"
+            case .chineseSimplified: return "百分比"
+            }
+        case .both:
+            switch lang {
+            case .english: return "Usage + %"
+            case .spanish: return "Uso + %"
+            case .french: return "Utilisation + %"
+            case .german: return "Nutzung + %"
+            case .japanese: return "用量 + %"
+            case .korean: return "사용량 + %"
+            case .chineseSimplified: return "用量 + %"
             }
         }
     }
@@ -744,6 +1039,36 @@ struct Loc {
             case .japanese: return "Terminal で `codex` を実行し、その後 `/login` を実行してください。"
             case .korean: return "터미널에서 `codex`를 실행한 다음 `/login`을 실행하세요."
             case .chineseSimplified: return "在终端运行 `codex`，然后执行 `/login`。"
+            }
+        case (.copilot, .missingAuth):
+            switch lang {
+            case .english: return "Use “Sign In to GitHub” below and complete the GitHub login flow in the app."
+            case .spanish: return "Usa «Iniciar sesión en GitHub» abajo y completa el inicio de sesión dentro de la app."
+            case .french: return "Utilisez « Se connecter à GitHub » ci-dessous et terminez la connexion dans l’app."
+            case .german: return "Nutze unten „Bei GitHub anmelden“ und schließe die Anmeldung in der App ab."
+            case .japanese: return "下の「GitHub にサインイン」を使い、アプリ内で GitHub ログインを完了してください。"
+            case .korean: return "아래의 “GitHub 로그인”을 눌러 앱 안에서 GitHub 로그인을 완료하세요."
+            case .chineseSimplified: return "点击下方“登录 GitHub”，在应用内完成 GitHub 登录。"
+            }
+        case (.copilot, .accessDenied):
+            switch lang {
+            case .english: return "Your account may not expose GitHub billing usage APIs. Sign in below to use the GitHub settings page fallback."
+            case .spanish: return "Puede que tu cuenta no exponga las API de uso de facturación de GitHub. Inicia sesión abajo para usar el respaldo de la página de ajustes."
+            case .french: return "Votre compte n’expose peut-être pas les API d’utilisation de facturation GitHub. Connectez-vous ci-dessous pour utiliser le secours via la page de réglages."
+            case .german: return "Dein Konto stellt die GitHub Billing-APIs möglicherweise nicht bereit. Melde dich unten an, um den Fallback über die Einstellungsseite zu nutzen."
+            case .japanese: return "このアカウントでは GitHub の billing usage API を使えない可能性があります。下からサインインして、設定ページ経由のフォールバックを使ってください。"
+            case .korean: return "이 계정은 GitHub billing usage API를 제공하지 않을 수 있습니다. 아래에서 로그인해 설정 페이지 fallback을 사용하세요."
+            case .chineseSimplified: return "你的账号可能拿不到 GitHub billing usage API。请在下方登录，改用 GitHub 设置页兜底。"
+            }
+        case (.copilot, .sessionExpired):
+            switch lang {
+            case .english: return "Sign in to GitHub again below, or replace the saved GitHub token with a fresh one."
+            case .spanish: return "Vuelve a iniciar sesión en GitHub abajo o sustituye el token guardado por uno nuevo."
+            case .french: return "Reconnectez-vous à GitHub ci-dessous ou remplacez le jeton enregistré par un nouveau."
+            case .german: return "Melde dich unten erneut bei GitHub an oder ersetze das gespeicherte Token durch ein neues."
+            case .japanese: return "下からもう一度 GitHub にサインインするか、保存済みの GitHub token を新しいものに置き換えてください。"
+            case .korean: return "아래에서 GitHub에 다시 로그인하거나 저장된 GitHub token을 새 것으로 교체하세요."
+            case .chineseSimplified: return "请在下方重新登录 GitHub，或用新的 GitHub 令牌替换当前保存的令牌。"
             }
         case (_, .error):
             return nil

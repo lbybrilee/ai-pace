@@ -1,17 +1,12 @@
 import SwiftUI
 
 struct StatusItemLabelView: View {
-    let claudeText: String?
-    let codexText: String?
-    let theme: AppTheme
+    let pills: [StatusItemPill]
 
     var body: some View {
         HStack(spacing: 6) {
-            if let claudeText {
-                pill(text: claudeText, color: theme.claudeAccent)
-            }
-            if let codexText {
-                pill(text: codexText, color: theme.codexAccent)
+            ForEach(Array(pills.enumerated()), id: \.offset) { entry in
+                pill(text: entry.element.text, color: entry.element.color)
             }
         }
         .padding(.horizontal, 4)
@@ -30,4 +25,9 @@ struct StatusItemLabelView: View {
                     .fill(color)
             )
     }
+}
+
+struct StatusItemPill {
+    let text: String
+    let color: Color
 }

@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 import Security
-import UserNotifications
+@preconcurrency import UserNotifications
 
 @MainActor
 protocol NotificationManaging: AnyObject {
