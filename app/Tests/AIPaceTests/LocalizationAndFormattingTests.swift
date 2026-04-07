@@ -40,6 +40,7 @@ struct LocalizationAndFormattingTests {
         #expect(AppTheme.find("missing-theme").id == AppTheme.defaultTheme.id)
         #expect(StatusItemFormatter.text(prefix: "Cl", snapshot: snapshot, mode: .usage) == "Cl 12/77")
         #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .insight) == "Cx +10%")
+        #expect(StatusItemFormatter.text(prefix: "Cx", snapshot: insightSnapshot, mode: .usageAndInsight) == "Cx 5/40 +10%")
     }
 
     @Test

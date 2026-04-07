@@ -99,7 +99,7 @@ This creates a DMG in the `dist/` folder using the current app version from `Inf
 If you need to override the stamped version for a specific build, pass `--version` explicitly:
 
 ```bash
-./scripts/build-dmg.sh --version 1.0.1
+./scripts/build-dmg.sh --version 1.1.0
 ```
 
 ### Option 2: Run From Terminal

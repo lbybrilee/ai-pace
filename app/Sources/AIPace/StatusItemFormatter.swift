@@ -15,6 +15,10 @@ enum StatusItemFormatter {
         case .insight:
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(insight)"
+        case .usageAndInsight:
+            let usage = "\(compactValue(for: snapshot.fiveHour))/\(compactValue(for: snapshot.weekly))"
+            let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
+            return "\(prefix) \(usage) \(insight)"
         }
     }
 }

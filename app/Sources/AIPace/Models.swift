@@ -39,6 +39,7 @@ struct AgentStatus: Equatable {
 enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case usage
     case insight
+    case usageAndInsight
 
     var id: String { rawValue }
 }
