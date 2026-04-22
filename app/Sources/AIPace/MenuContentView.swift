@@ -60,7 +60,8 @@ struct MenuContentView: View {
             HStack {
                 if let ts = store.lastUpdated {
                     Text(ts.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(.system(size: 11))
+                        .monospacedDigit()
                         .foregroundStyle(.tertiary)
                 }
                 Spacer()
@@ -282,7 +283,8 @@ private struct UsageRow: View {
                 Group {
                     if let used = window.usedPercentage {
                         Text("\(Int(used.rounded()))%")
-                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                            .font(.system(size: 14, weight: .medium))
+                            .monospacedDigit()
                     } else {
                         Text(loc.displayMessage(window.message))
                             .font(.system(size: 12))
@@ -294,7 +296,8 @@ private struct UsageRow: View {
                 Group {
                     if let resetsAt = window.resetsAt {
                         Text(formatReset(resetsAt))
-                            .font(.system(size: 12, design: .monospaced))
+                            .font(.system(size: 12))
+                            .monospacedDigit()
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -744,7 +747,7 @@ private struct AgentStatusRow: View {
             return .green
         case .loading:
             return .secondary
-        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn:
+        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn, .rateLimited:
             return .orange
         case .error:
             return .red

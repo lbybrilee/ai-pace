@@ -18,13 +18,14 @@ enum AgentAvailability: Equatable {
     case sessionExpired
     case notInstalled
     case notLoggedIn
+    case rateLimited
     case error(String)
 
     var showsInPopover: Bool {
         switch self {
         case .loading, .available:
             return true
-        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn, .error:
+        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn, .rateLimited, .error:
             return false
         }
     }

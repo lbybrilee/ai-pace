@@ -88,12 +88,14 @@ final class UsageStore: ObservableObject {
         let newClaude = await claudeSnapshot
         let newCodex = await codexSnapshot
 
-        let resolvedClaude = mergedSnapshot(previous: previousClaude, current: newClaude)
-        let resolvedCodex = mergedSnapshot(previous: previousCodex, current: newCodex)
+        let (resolvedClaude, claudePreserved) = mergedSnapshot(previous: previousClaude, current: newClaude)
+        let (resolvedCodex, codexPreserved) = mergedSnapshot(previous: previousCodex, current: newCodex)
 
         claude = resolvedClaude
         codex = resolvedCodex
-        lastUpdated = Date()
+        if !claudePreserved || !codexPreserved {
+            lastUpdated = Date()
+        }
 
         await notifyIfWindowRefreshed(previous: previousClaude, current: resolvedClaude)
         await notifyIfWindowRefreshed(previous: previousCodex, current: resolvedCodex)
@@ -255,17 +257,17 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func mergedSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> ProviderSnapshot {
+    private func mergedSnapshot(previous: ProviderSnapshot, current: ProviderSnapshot) -> (snapshot: ProviderSnapshot, wasPreserved: Bool) {
         guard shouldPreservePreviousSnapshot(
             previous: previous,
             current: current,
             preservedFailureCount: preservedFailureCounts[current.provider, default: 0]
         ) else {
             preservedFailureCounts[current.provider] = 0
-            return current
+            return (current, false)
         }
         preservedFailureCounts[current.provider, default: 0] += 1
-        return previous
+        return (previous, true)
     }
 
     private func shouldPreservePreviousSnapshot(
@@ -315,6 +317,9 @@ final class UsageStore: ObservableObject {
         if normalized.contains("session expired")
             || normalized.contains("authentication failed") {
             return AgentStatus(provider: .claude, availability: .sessionExpired, message: message)
+        }
+        if normalized.contains("http 429") || normalized.contains("rate limit") {
+            return AgentStatus(provider: .claude, availability: .rateLimited, message: message)
         }
 
         return AgentStatus(provider: .claude, availability: .error(message), message: message)

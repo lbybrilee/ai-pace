@@ -678,6 +678,16 @@ struct Loc {
             case .korean: return "로그인되지 않음"
             case .chineseSimplified: return "未登录"
             }
+        case .rateLimited:
+            switch lang {
+            case .english: return "Rate limited"
+            case .spanish: return "Límite alcanzado"
+            case .french: return "Limite atteinte"
+            case .german: return "Ratenlimit"
+            case .japanese: return "レート制限中"
+            case .korean: return "요청 한도 초과"
+            case .chineseSimplified: return "请求受限"
+            }
         case .error:
             switch lang {
             case .english: return "Error"
@@ -744,6 +754,16 @@ struct Loc {
             case .japanese: return "Terminal で `codex` を実行し、その後 `/login` を実行してください。"
             case .korean: return "터미널에서 `codex`를 실행한 다음 `/login`을 실행하세요."
             case .chineseSimplified: return "在终端运行 `codex`，然后执行 `/login`。"
+            }
+        case (_, .rateLimited):
+            switch lang {
+            case .english: return "The usage API is temporarily rate limited. Data will update on the next successful refresh."
+            case .spanish: return "La API de uso está temporalmente limitada. Los datos se actualizarán en la próxima actualización exitosa."
+            case .french: return "L'API d'utilisation est temporairement limitée. Les données seront mises à jour lors du prochain rafraîchissement réussi."
+            case .german: return "Die Nutzungs-API ist vorübergehend gedrosselt. Daten werden beim nächsten erfolgreichen Abruf aktualisiert."
+            case .japanese: return "使用量 API は一時的にレート制限されています。次回の更新が成功したときにデータが更新されます。"
+            case .korean: return "사용량 API가 일시적으로 요청 한도를 초과했습니다. 다음 새로고침이 성공하면 데이터가 업데이트됩니다."
+            case .chineseSimplified: return "用量 API 暂时受到请求限制，下次成功刷新时数据将更新。"
             }
         case (_, .error):
             return nil

@@ -21,7 +21,8 @@ struct StatusItemLabelView: View {
 
     private func pill(text: String, color: Color) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+            .font(.system(size: 11, weight: .semibold))
+            .monospacedDigit()
             .foregroundStyle(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
