@@ -1,6 +1,17 @@
 import AppKit
 import SwiftUI
 
+private extension ProviderKind {
+    var dashboardURL: URL {
+        switch self {
+        case .claude:
+            return URL(string: "https://claude.ai/settings/usage")!
+        case .codex:
+            return URL(string: "https://chatgpt.com/codex/cloud/settings/analytics#usage")!
+        }
+    }
+}
+
 // MARK: - Main Popover
 
 struct MenuContentView: View {
@@ -200,6 +211,15 @@ private struct ProviderCard: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
+                Button {
+                    NSWorkspace.shared.open(snapshot.provider.dashboardURL)
+                } label: {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .pointerOnHover()
             }
 
             // Usage rows
