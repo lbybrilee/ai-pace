@@ -6,6 +6,8 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-25
+
 ### Added
 - Remaining percentage display options for the menu bar and popover
 
