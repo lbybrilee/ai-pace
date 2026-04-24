@@ -8,10 +8,20 @@ enum StatusItemFormatter {
         return String(Int(used.rounded()))
     }
 
+    static func compactRemainingValue(for window: UsageWindow) -> String {
+        guard let used = window.usedPercentage else {
+            return "--"
+        }
+        let remaining = max(0, 100 - used)
+        return String(Int(remaining.rounded()))
+    }
+
     static func text(prefix: String, snapshot: ProviderSnapshot, mode: MenuBarDisplayMode) -> String {
         switch mode {
         case .usage:
             return "\(prefix) \(compactValue(for: snapshot.fiveHour))/\(compactValue(for: snapshot.weekly))"
+        case .remaining:
+            return "\(prefix) \(compactRemainingValue(for: snapshot.fiveHour))/\(compactRemainingValue(for: snapshot.weekly))"
         case .insight:
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(insight)"
@@ -19,6 +29,10 @@ enum StatusItemFormatter {
             let usage = "\(compactValue(for: snapshot.fiveHour))/\(compactValue(for: snapshot.weekly))"
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(usage) \(insight)"
+        case .remainingAndInsight:
+            let remaining = "\(compactRemainingValue(for: snapshot.fiveHour))/\(compactRemainingValue(for: snapshot.weekly))"
+            let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
+            return "\(prefix) \(remaining) \(insight)"
         }
     }
 }

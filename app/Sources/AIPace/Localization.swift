@@ -171,6 +171,30 @@ struct Loc {
         }
     }
 
+    var popoverDisplay: String {
+        switch lang {
+        case .english: return "Popover"
+        case .spanish: return "Ventana emergente"
+        case .french: return "Fenêtre contextuelle"
+        case .german: return "Popover"
+        case .japanese: return "ポップオーバー"
+        case .korean: return "팝오버"
+        case .chineseSimplified: return "弹出窗口"
+        }
+    }
+
+    var remainingSuffix: String {
+        switch lang {
+        case .english: return "left"
+        case .spanish: return "restante"
+        case .french: return "restant"
+        case .german: return "übrig"
+        case .japanese: return "残り"
+        case .korean: return "남음"
+        case .chineseSimplified: return "剩余"
+        }
+    }
+
     var providers: String {
         switch lang {
         case .english: return "Providers"
@@ -583,6 +607,16 @@ struct Loc {
             case .korean: return "사용률 %"
             case .chineseSimplified: return "用量 %"
             }
+        case .remaining:
+            switch lang {
+            case .english: return "Remaining %"
+            case .spanish: return "Restante %"
+            case .french: return "Restant %"
+            case .german: return "Verbleibend %"
+            case .japanese: return "残り %"
+            case .korean: return "남은 %"
+            case .chineseSimplified: return "剩余 %"
+            }
         case .insight:
             switch lang {
             case .english: return "Insight +/-%"
@@ -602,6 +636,41 @@ struct Loc {
             case .japanese: return "使用率 % + インサイト"
             case .korean: return "사용률 % + 인사이트"
             case .chineseSimplified: return "用量 % + 洞察"
+            }
+        case .remainingAndInsight:
+            switch lang {
+            case .english: return "Remaining % + Insight"
+            case .spanish: return "Restante % + ritmo"
+            case .french: return "Restant % + tendance"
+            case .german: return "Verbleibend % + Tendenz"
+            case .japanese: return "残り % + インサイト"
+            case .korean: return "남은 % + 인사이트"
+            case .chineseSimplified: return "剩余 % + 洞察"
+            }
+        }
+    }
+
+    func popoverDisplayLabel(_ mode: PopoverDisplayMode) -> String {
+        switch mode {
+        case .usage:
+            switch lang {
+            case .english: return "Usage %"
+            case .spanish: return "Uso %"
+            case .french: return "Utilisation %"
+            case .german: return "Nutzung %"
+            case .japanese: return "使用率 %"
+            case .korean: return "사용률 %"
+            case .chineseSimplified: return "用量 %"
+            }
+        case .remaining:
+            switch lang {
+            case .english: return "Remaining %"
+            case .spanish: return "Restante %"
+            case .french: return "Restant %"
+            case .german: return "Verbleibend %"
+            case .japanese: return "残り %"
+            case .korean: return "남은 %"
+            case .chineseSimplified: return "剩余 %"
             }
         }
     }

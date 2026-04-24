@@ -38,8 +38,17 @@ struct AgentStatus: Equatable {
 
 enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case usage
+    case remaining
     case insight
     case usageAndInsight
+    case remainingAndInsight
+
+    var id: String { rawValue }
+}
+
+enum PopoverDisplayMode: String, CaseIterable, Identifiable {
+    case usage
+    case remaining
 
     var id: String { rawValue }
 }
