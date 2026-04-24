@@ -243,11 +243,13 @@ private struct UsageRow: View {
     @ObservedObject var store: UsageStore
     let accent: Color
     let lang: AppLanguage
+    @AppStorage("popoverDisplayMode") private var popoverDisplayModeID = PopoverDisplayMode.usage.rawValue
 
     private var key: UsageWindowKey { UsageWindowKey(provider: provider, kind: window.kind) }
     private var notifyEnabled: Bool { store.refreshNotificationsEnabled(for: key) }
     private var notificationsDisabledInSystem: Bool { store.notificationsDisabledInSystem }
     private var loc: Loc { Loc(lang: lang) }
+    private var popoverMode: PopoverDisplayMode { PopoverDisplayMode(rawValue: popoverDisplayModeID) ?? .usage }
     private let barLeadingInset: CGFloat = 30
 
     var body: some View {
@@ -281,7 +283,7 @@ private struct UsageRow: View {
 
                 Group {
                     if let used = window.usedPercentage {
-                        Text("\(Int(used.rounded()))%")
+                        Text(percentageText(for: used))
                             .font(.system(size: 14, weight: .medium, design: .monospaced))
                     } else {
                         Text(loc.displayMessage(window.message))
@@ -289,7 +291,7 @@ private struct UsageRow: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
-                .frame(minWidth: 36, alignment: .trailing)
+                .frame(minWidth: popoverMode == .remaining ? 72 : 36, alignment: .trailing)
 
                 Group {
                     if let resetsAt = window.resetsAt {
@@ -302,8 +304,19 @@ private struct UsageRow: View {
             }
 
             // Bottom tier: full-width bar
-            UsageBar(percentage: window.usedPercentage, accent: accent)
+            UsageBar(percentage: window.usedPercentage, accent: accent, mode: popoverMode)
                 .padding(.leading, barLeadingInset)
+        }
+    }
+
+    private func percentageText(for used: Double) -> String {
+        let clampedUsed = min(max(used, 0), 100)
+        switch popoverMode {
+        case .usage:
+            return "\(Int(clampedUsed.rounded()))%"
+        case .remaining:
+            let remaining = 100 - clampedUsed
+            return "\(Int(remaining.rounded()))% \(loc.remainingSuffix)"
         }
     }
 
@@ -345,6 +358,7 @@ private struct FlashingDot: View {
 private struct UsageBar: View {
     let percentage: Double?
     let accent: Color
+    let mode: PopoverDisplayMode
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -353,9 +367,11 @@ private struct UsageBar: View {
                 Capsule()
                     .fill(Color.primary.opacity(colorScheme == .dark ? 0.08 : 0.12))
                 if let pct = percentage {
+                    let clamped = min(max(pct, 0), 100)
+                    let displayPct = mode == .remaining ? (100 - clamped) : clamped
                     Capsule()
-                        .fill(accent.opacity(barOpacity(for: pct)))
-                        .frame(width: max(2, geo.size.width * min(max(pct, 0), 100) / 100))
+                        .fill(accent.opacity(barOpacity(for: clamped)))
+                        .frame(width: max(2, geo.size.width * displayPct / 100))
                 }
             }
         }
@@ -376,6 +392,7 @@ struct SettingsView: View {
     @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
+    @AppStorage("popoverDisplayMode") private var popoverDisplayModeID = PopoverDisplayMode.usage.rawValue
 
     private var lang: AppLanguage { AppLanguage(rawValue: langID) ?? .english }
     private var loc: Loc { Loc(lang: lang) }
@@ -392,7 +409,8 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .frame(width: 180)
+                    .fixedSize()
+                    .frame(width: 180, alignment: .trailing)
                 }
 
                 Divider()
@@ -428,7 +446,8 @@ struct SettingsView: View {
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
-                        .frame(width: 180)
+                        .fixedSize()
+                        .frame(width: 180, alignment: .trailing)
                     }
 
                     Text(loc.autoRefreshDesc)
@@ -448,7 +467,22 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .frame(width: 180)
+                    .fixedSize()
+                    .frame(width: 180, alignment: .trailing)
+                }
+
+                Divider()
+
+                settingRow(loc.popoverDisplay) {
+                    Picker("", selection: $popoverDisplayModeID) {
+                        ForEach(PopoverDisplayMode.allCases) { mode in
+                            Text(loc.popoverDisplayLabel(mode)).tag(mode.rawValue)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                    .frame(width: 180, alignment: .trailing)
                 }
             }
 
@@ -489,7 +523,7 @@ struct SettingsView: View {
                             }
                             .pickerStyle(.menu)
                             .labelsHidden()
-                            .frame(width: 140)
+                            .fixedSize()
 
                             Button {
                                 store.previewNotificationSound()
@@ -501,6 +535,7 @@ struct SettingsView: View {
                             .buttonStyle(.borderless)
                             .pointerOnHover()
                         }
+                        .frame(width: 180, alignment: .trailing)
                     }
 
                     Text(loc.notificationsDesc)
