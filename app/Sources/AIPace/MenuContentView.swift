@@ -371,7 +371,7 @@ private struct UsageBar: View {
                     let displayPct = mode == .remaining ? (100 - clamped) : clamped
                     Capsule()
                         .fill(accent.opacity(barOpacity(for: clamped)))
-                        .frame(width: max(2, geo.size.width * displayPct / 100))
+                        .frame(width: displayPct <= 0 ? 0 : max(2, geo.size.width * displayPct / 100))
                 }
             }
         }
