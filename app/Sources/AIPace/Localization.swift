@@ -99,6 +99,49 @@ struct Loc {
         }
     }
 
+    var claudeName: String {
+        switch lang {
+        case .english: return "Claude Name"
+        case .spanish: return "Nombre de Claude"
+        case .french: return "Nom de Claude"
+        case .german: return "Claude-Name"
+        case .japanese: return "Claude の名前"
+        case .korean: return "Claude 이름"
+        case .chineseSimplified: return "Claude 名称"
+        }
+    }
+
+    var codexName: String {
+        switch lang {
+        case .english: return "Codex Name"
+        case .spanish: return "Nombre de Codex"
+        case .french: return "Nom de Codex"
+        case .german: return "Codex-Name"
+        case .japanese: return "Codex の名前"
+        case .korean: return "Codex 이름"
+        case .chineseSimplified: return "Codex 名称"
+        }
+    }
+
+    var agentNamesDesc: String {
+        switch lang {
+        case .english:
+            return "Names can be up to 7 characters. Leave blank to use the default name."
+        case .spanish:
+            return "Los nombres pueden tener hasta 7 caracteres. Déjalo en blanco para usar el nombre predeterminado."
+        case .french:
+            return "Les noms peuvent contenir jusqu'à 7 caractères. Laissez vide pour utiliser le nom par défaut."
+        case .german:
+            return "Namen dürfen bis zu 7 Zeichen lang sein. Leer lassen, um den Standardnamen zu verwenden."
+        case .japanese:
+            return "名前は最大 7 文字です。空欄にすると既定の名前を使います。"
+        case .korean:
+            return "이름은 최대 7자까지 가능합니다. 비워 두면 기본 이름을 사용합니다."
+        case .chineseSimplified:
+            return "名称最多 7 个字符。留空则使用默认名称。"
+        }
+    }
+
     var reset: String {
         switch lang {
         case .english: return "Reset"
