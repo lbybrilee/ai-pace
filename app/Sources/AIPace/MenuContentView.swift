@@ -390,6 +390,8 @@ struct SettingsView: View {
     @AppStorage("selectedTheme") private var selectedThemeID = AppTheme.defaultTheme.id
     @AppStorage(AppTheme.customClaudeAccentDefaultsKey) private var customClaudeAccentHex = ""
     @AppStorage(AppTheme.customCodexAccentDefaultsKey) private var customCodexAccentHex = ""
+    @AppStorage(ProviderDisplayName.customClaudeNameDefaultsKey) private var customClaudeName = ""
+    @AppStorage(ProviderDisplayName.customCodexNameDefaultsKey) private var customCodexName = ""
     @AppStorage("appLanguage") private var langID = AppLanguage.english.rawValue
     @AppStorage("menuBarDisplayMode") private var menuBarDisplayModeID = MenuBarDisplayMode.usage.rawValue
     @AppStorage("popoverDisplayMode") private var popoverDisplayModeID = PopoverDisplayMode.usage.rawValue
@@ -487,6 +489,24 @@ struct SettingsView: View {
             }
 
             settingsCard(title: loc.agents) {
+                settingRow(loc.claudeName) {
+                    AgentNameField(customName: $customClaudeName, provider: .claude)
+                }
+
+                Divider()
+
+                settingRow(loc.codexName) {
+                    AgentNameField(customName: $customCodexName, provider: .codex)
+                }
+
+                Text(loc.agentNamesDesc)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 136)
+
+                Divider()
+
                 AgentStatusRow(status: store.agentStatus(for: .claude))
 
                 Divider()
@@ -640,6 +660,24 @@ struct SettingsView: View {
             return .orange
         }
         return .secondary
+    }
+}
+
+private struct AgentNameField: View {
+    @Binding var customName: String
+    let provider: ProviderKind
+
+    var body: some View {
+        TextField(
+            ProviderDisplayName.defaultName(for: provider),
+            text: Binding(
+                get: { ProviderDisplayName.sanitizedInput(customName) },
+                set: { customName = ProviderDisplayName.sanitizedInput($0) }
+            )
+        )
+        .textFieldStyle(.roundedBorder)
+        .font(.system(size: 12))
+        .frame(width: 180)
     }
 }
 

@@ -5,6 +5,44 @@ enum ProviderKind: String {
     case codex = "Codex"
 }
 
+enum ProviderDisplayName {
+    static let maxLength = 7
+    static let customClaudeNameDefaultsKey = "customClaudeName"
+    static let customCodexNameDefaultsKey = "customCodexName"
+
+    static func defaultsKey(for provider: ProviderKind) -> String {
+        switch provider {
+        case .claude:
+            return customClaudeNameDefaultsKey
+        case .codex:
+            return customCodexNameDefaultsKey
+        }
+    }
+
+    static func defaultName(for provider: ProviderKind) -> String {
+        switch provider {
+        case .claude:
+            return "Cl"
+        case .codex:
+            return "Cx"
+        }
+    }
+
+    static func sanitizedInput(_ value: String) -> String {
+        String(value.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxLength))
+    }
+
+    static func displayName(
+        for provider: ProviderKind,
+        customName: String? = nil,
+        userDefaults: UserDefaults = .standard
+    ) -> String {
+        let storedName = customName ?? userDefaults.string(forKey: defaultsKey(for: provider)) ?? ""
+        let sanitizedName = sanitizedInput(storedName)
+        return sanitizedName.isEmpty ? defaultName(for: provider) : sanitizedName
+    }
+}
+
 enum UsageWindowKind: String {
     case fiveHour = "5h"
     case weekly = "Week"

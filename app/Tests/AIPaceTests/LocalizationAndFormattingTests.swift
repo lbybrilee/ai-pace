@@ -13,6 +13,7 @@ struct LocalizationAndFormattingTests {
         #expect(korean.colors == "색상")
         #expect(korean.reset == "재설정")
         #expect(korean.claudeColor == "Claude 색상")
+        #expect(korean.claudeName == "Claude 이름")
         #expect(korean.launchAtStartup == "시동 시 실행")
     }
 
@@ -60,5 +61,22 @@ struct LocalizationAndFormattingTests {
         #expect(AppColorHex.normalized("f60") == "#FF6600")
         #expect(AppColorHex.string(from: theme.claudeAccent) == "#123ABC")
         #expect(AppColorHex.string(from: theme.codexAccent) == AppColorHex.string(from: AppTheme.sunset.codexAccent))
+    }
+
+    @Test
+    func customProviderNamesAreTrimmedAndCapped() {
+        let suiteName = "AIPaceTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        defaults.set("  SonnetPro  ", forKey: ProviderDisplayName.customClaudeNameDefaultsKey)
+        defaults.set("  ", forKey: ProviderDisplayName.customCodexNameDefaultsKey)
+
+        #expect(ProviderDisplayName.maxLength == 7)
+        #expect(ProviderDisplayName.sanitizedInput("CodeRunner") == "CodeRun")
+        #expect(ProviderDisplayName.displayName(for: .claude, userDefaults: defaults) == "SonnetP")
+        #expect(ProviderDisplayName.displayName(for: .codex, userDefaults: defaults) == "Cx")
     }
 }

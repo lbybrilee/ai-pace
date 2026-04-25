@@ -63,7 +63,9 @@ final class UsageStore: ObservableObject {
     }
 
     var menuBarTitle: String {
-        "Cl \(compactValue(for: claude.fiveHour))/\(compactValue(for: claude.weekly))  Cx \(compactValue(for: codex.fiveHour))/\(compactValue(for: codex.weekly))"
+        let claudeName = ProviderDisplayName.displayName(for: .claude, userDefaults: userDefaults)
+        let codexName = ProviderDisplayName.displayName(for: .codex, userDefaults: userDefaults)
+        return "\(claudeName) \(compactValue(for: claude.fiveHour))/\(compactValue(for: claude.weekly))  \(codexName) \(compactValue(for: codex.fiveHour))/\(compactValue(for: codex.weekly))"
     }
 
     var visibleSnapshots: [ProviderSnapshot] {

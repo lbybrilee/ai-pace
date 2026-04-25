@@ -105,13 +105,15 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
         ) ?? .usage
         let claudeStatus = store.agentStatus(for: .claude)
         let codexStatus = store.agentStatus(for: .codex)
+        let claudeName = ProviderDisplayName.displayName(for: .claude)
+        let codexName = ProviderDisplayName.displayName(for: .codex)
 
         return StatusItemLabelView(
             claudeText: claudeStatus.availability.showsInPopover
-                ? StatusItemFormatter.text(prefix: "Cl", snapshot: store.claude, mode: displayMode)
+                ? StatusItemFormatter.text(prefix: claudeName, snapshot: store.claude, mode: displayMode)
                 : nil,
             codexText: codexStatus.availability.showsInPopover
-                ? StatusItemFormatter.text(prefix: "Cx", snapshot: store.codex, mode: displayMode)
+                ? StatusItemFormatter.text(prefix: codexName, snapshot: store.codex, mode: displayMode)
                 : nil,
             theme: resolvedTheme
         )
