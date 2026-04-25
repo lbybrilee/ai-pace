@@ -26,7 +26,7 @@ struct ClaudeCredentialLoaderTests {
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: ["CLAUDE_CODE_OAUTH_TOKEN": "env-token"],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
 
         let resolution = loader.resolveCredentials()
@@ -46,7 +46,7 @@ struct ClaudeCredentialLoaderTests {
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: ["CLAUDE_CODE_OAUTH_TOKEN": " env-token \n"],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
 
         let resolution = loader.resolveCredentials()
@@ -56,11 +56,55 @@ struct ClaudeCredentialLoaderTests {
     }
 
     @Test
+    func resolveCredentialsReadsFromKeychainWhenFileMissing() throws {
+        let homeDirectory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: homeDirectory) }
+
+        let keychain = InMemoryKeychain()
+        let json = """
+        {"claudeAiOauth":{"accessToken":"keychain-token","refreshToken":"kc-refresh","expiresAt":9999}}
+        """
+        keychain.items["Claude Code-credentials"] = Data(json.utf8)
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: homeDirectory,
+            environment: [:],
+            keychain: keychain
+        )
+
+        let resolution = loader.resolveCredentials()
+
+        #expect(resolution.credentials?.source == .keychain)
+        #expect(resolution.credentials?.oauth.accessToken == "keychain-token")
+        #expect(resolution.credentials?.oauth.refreshToken == "kc-refresh")
+    }
+
+    @Test
+    func resolveCredentialsSurfacesKeychainAccessDeniedIssue() throws {
+        let homeDirectory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: homeDirectory) }
+
+        let keychain = InMemoryKeychain()
+        keychain.loadResult = .failure(.keychainAccessDenied)
+
+        let loader = ClaudeCredentialLoader(
+            homeDirectory: homeDirectory,
+            environment: [:],
+            keychain: keychain
+        )
+
+        let resolution = loader.resolveCredentials()
+
+        #expect(resolution.credentials == nil)
+        #expect(resolution.issue == .keychainAccessDenied)
+    }
+
+    @Test
     func needsRefreshHonorsExpiryBuffer() {
         let loader = ClaudeCredentialLoader(
             homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
 
         let now = Date().timeIntervalSince1970 * 1000
@@ -73,15 +117,18 @@ struct ClaudeCredentialLoaderTests {
     }
 
     @Test
-    func saveCredentialsWritesUpdatedFileContents() throws {
+    func saveCredentialsRoundTripsUnknownTopLevelKeys() throws {
         let homeDirectory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: homeDirectory) }
 
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
+        let originalJSON = """
+        {"existing":"value","claudeAiOauth":{"accessToken":"old"}}
+        """
         let result = ClaudeCredentialResult(
             oauth: ClaudeOAuthCredentials(
                 accessToken: "updated-token",
@@ -90,7 +137,7 @@ struct ClaudeCredentialLoaderTests {
                 subscriptionType: "claude_max"
             ),
             source: .file,
-            fullData: ["existing": "value"]
+            rawFileData: Data(originalJSON.utf8)
         )
 
         loader.saveCredentials(result)
@@ -108,25 +155,44 @@ struct ClaudeCredentialLoaderTests {
     }
 
     @Test
-    func mapKeychainErrorCategorizesCommonFailures() throws {
+    func saveCredentialsKeychainSourceWritesThroughProtocol() throws {
+        let homeDirectory = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: homeDirectory) }
+
+        let keychain = InMemoryKeychain()
         let loader = ClaudeCredentialLoader(
-            homeDirectory: try makeTemporaryDirectory(),
+            homeDirectory: homeDirectory,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: keychain
         )
 
-        switch loader.mapKeychainError(.terminated(1, "User interaction is not allowed.")) {
-        case .failure(let issue):
-            #expect(issue == .keychainAccessDenied)
-        default:
-            Issue.record("Expected access denied classification")
-        }
+        let result = ClaudeCredentialResult(
+            oauth: ClaudeOAuthCredentials(accessToken: "kc-token", refreshToken: "kc-refresh", expiresAt: 1, subscriptionType: nil),
+            source: .keychain,
+            rawFileData: nil
+        )
 
-        switch loader.mapKeychainError(.terminated(44, "The specified item could not be found in the keychain.")) {
-        case .success(let credentials):
-            #expect(credentials == nil)
-        default:
-            Issue.record("Expected missing keychain item to map to no credentials")
-        }
+        loader.saveCredentials(result)
+
+        let stored = try #require(keychain.items["Claude Code-credentials"])
+        let object = try #require(JSONSerialization.jsonObject(with: stored) as? [String: Any])
+        let oauth = try #require(object["claudeAiOauth"] as? [String: Any])
+        #expect(oauth["accessToken"] as? String == "kc-token")
+        #expect(oauth["refreshToken"] as? String == "kc-refresh")
+    }
+}
+
+final class InMemoryKeychain: ClaudeKeychainAccessing, @unchecked Sendable {
+    var items: [String: Data] = [:]
+    var loadResult: Result<Data?, ClaudeCredentialLoadIssue>?
+
+    func load(service: String) -> Result<Data?, ClaudeCredentialLoadIssue> {
+        if let loadResult { return loadResult }
+        return .success(items[service])
+    }
+
+    func save(service: String, data: Data) -> Result<Void, ClaudeCredentialLoadIssue> {
+        items[service] = data
+        return .success(())
     }
 }

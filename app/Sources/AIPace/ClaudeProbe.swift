@@ -89,6 +89,15 @@ struct ClaudeProbe: Sendable {
         return try JSONDecoder().decode(ClaudeAuthStatus.self, from: Data(output.utf8))
     }
 
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = false
+        config.httpAdditionalHeaders = ["User-Agent": "AIPace"]
+        return URLSession(configuration: config)
+    }()
+
     static func liveRefreshToken(
         _ credentials: ClaudeCredentialResult,
         credentialLoader: ClaudeCredentialLoader
@@ -99,7 +108,6 @@ struct ClaudeProbe: Sendable {
 
         var request = URLRequest(url: URL(string: "https://platform.claude.com/v1/oauth/token")!)
         request.httpMethod = "POST"
-        request.timeoutInterval = 20
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "grant_type": "refresh_token",
@@ -108,7 +116,7 @@ struct ClaudeProbe: Sendable {
             "scope": "user:profile user:inference user:sessions:claude_code",
         ])
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw ProcessRunnerError.invalidResponse("Claude refresh endpoint returned an invalid response.")
         }
@@ -145,15 +153,13 @@ struct ClaudeProbe: Sendable {
     static func liveFetchUsage(with accessToken: String) async throws -> ClaudeUsageResponse {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.httpMethod = "GET"
-        request.timeoutInterval = 20
         request.setValue("Bearer \(accessToken.trimmingCharacters(in: .whitespacesAndNewlines))", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("AIPace", forHTTPHeaderField: "User-Agent")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw ProcessRunnerError.invalidResponse("Claude usage endpoint returned an invalid response.")
             }

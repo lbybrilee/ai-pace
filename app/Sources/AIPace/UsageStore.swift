@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import SwiftUI
 
 protocol ProviderSnapshotFetching: Sendable {
@@ -9,28 +10,35 @@ extension ClaudeProbe: ProviderSnapshotFetching {}
 extension CodexProbe: ProviderSnapshotFetching {}
 
 @MainActor
-final class UsageStore: ObservableObject {
-    @Published var claude = ProviderSnapshot.loading(.claude)
-    @Published var codex = ProviderSnapshot.loading(.codex)
-    @Published var lastUpdated: Date?
-    @Published var isRefreshing = false
-    @Published private(set) var refreshNotificationKeys: Set<String>
-    @Published var autoRefreshInterval: AutoRefreshInterval
-    @Published var notificationSound: NotificationSoundOption
-    @Published private(set) var notificationsDisabledInSystem = false
-    @Published private(set) var launchAtStartupState: LaunchAtStartupState
-    @Published private(set) var launchAtStartupErrorMessage: String?
+@Observable
+final class UsageStore {
+    var claude = ProviderSnapshot.loading(.claude)
+    var codex = ProviderSnapshot.loading(.codex)
+    var lastUpdated: Date?
+    var isRefreshing = false
+    private(set) var refreshNotificationKeys: Set<String>
+    var autoRefreshInterval: AutoRefreshInterval
+    var notificationSound: NotificationSoundOption
+    var refreshOnOpen: Bool
+    private(set) var notificationsDisabledInSystem = false
+    private(set) var launchAtStartupState: LaunchAtStartupState
+    private(set) var launchAtStartupErrorMessage: String?
+    private(set) var history: UsageHistoryStore
+    private(set) var topClaudeProjects: [ProjectAttribution] = []
+    var liveActivityMonitor: LiveActivityMonitor
 
-    private let claudeProbe: any ProviderSnapshotFetching
-    private let codexProbe: any ProviderSnapshotFetching
-    private let notificationManager: any NotificationManaging
-    private let launchAtStartupManager: any LaunchAtStartupManaging
-    private let userDefaults: UserDefaults
-    private var refreshTask: Task<Void, Never>?
-    private var preservedFailureCounts: [ProviderKind: Int] = [:]
-    private let refreshNotificationDefaultsKey = "refreshNotificationKeys"
-    private let autoRefreshIntervalDefaultsKey = "autoRefreshInterval"
-    private let notificationSoundDefaultsKey = "notificationSound"
+    @ObservationIgnored private let claudeProbe: any ProviderSnapshotFetching
+    @ObservationIgnored private let codexProbe: any ProviderSnapshotFetching
+    @ObservationIgnored private let notificationManager: any NotificationManaging
+    @ObservationIgnored private let launchAtStartupManager: any LaunchAtStartupManaging
+    @ObservationIgnored private let userDefaults: UserDefaults
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var preservedFailureCounts: [ProviderKind: Int] = [:]
+    @ObservationIgnored private let refreshNotificationDefaultsKey = "refreshNotificationKeys"
+    @ObservationIgnored private let autoRefreshIntervalDefaultsKey = "autoRefreshInterval"
+    @ObservationIgnored private let notificationSoundDefaultsKey = "notificationSound"
+    @ObservationIgnored private let refreshOnOpenDefaultsKey = "refreshOnOpen"
+    @ObservationIgnored private let historyDefaultsKey = "usageHistory_v1"
 
     init(
         claudeProbe: any ProviderSnapshotFetching = ClaudeProbe(),
@@ -38,6 +46,7 @@ final class UsageStore: ObservableObject {
         notificationManager: any NotificationManaging = NotificationManager(),
         launchAtStartupManager: any LaunchAtStartupManaging = LaunchAtStartupManager(),
         userDefaults: UserDefaults = .standard,
+        liveActivityMonitor: LiveActivityMonitor? = nil,
         startRefreshLoop: Bool = true
     ) {
         self.claudeProbe = claudeProbe
@@ -45,17 +54,34 @@ final class UsageStore: ObservableObject {
         self.notificationManager = notificationManager
         self.launchAtStartupManager = launchAtStartupManager
         self.userDefaults = userDefaults
+        self.liveActivityMonitor = liveActivityMonitor
+            ?? LiveActivityMonitor(autoStart: startRefreshLoop)
         refreshNotificationKeys = Set(userDefaults.stringArray(forKey: refreshNotificationDefaultsKey) ?? [])
         let storedInterval = userDefaults.integer(forKey: autoRefreshIntervalDefaultsKey)
         autoRefreshInterval = AutoRefreshInterval(rawValue: storedInterval) ?? .defaultValue
         notificationSound = NotificationSoundOption(
             rawValue: userDefaults.string(forKey: notificationSoundDefaultsKey) ?? NotificationSoundOption.systemDefault.rawValue
         ) ?? .systemDefault
+        refreshOnOpen = userDefaults.object(forKey: refreshOnOpenDefaultsKey) as? Bool ?? true
         launchAtStartupState = launchAtStartupManager.currentState()
         launchAtStartupErrorMessage = nil
+        history = UsageHistoryStore.load(from: userDefaults, key: historyDefaultsKey)
         if startRefreshLoop {
             self.startRefreshLoop()
         }
+    }
+
+    func setRefreshOnOpen(_ enabled: Bool) {
+        guard refreshOnOpen != enabled else { return }
+        refreshOnOpen = enabled
+        userDefaults.set(enabled, forKey: refreshOnOpenDefaultsKey)
+    }
+
+    /// Called by StatusItemController when the user clicks the menu bar pill.
+    /// Refreshes if the "refresh on open" setting is enabled, unless a refresh is already running.
+    func refreshOnPopoverOpen() async {
+        guard refreshOnOpen, !isRefreshing else { return }
+        await refresh()
     }
 
     deinit {
@@ -74,6 +100,22 @@ final class UsageStore: ObservableObject {
 
     var hasVisibleSnapshots: Bool {
         !visibleSnapshots.isEmpty
+    }
+
+    /// Providers in an error state — surfaced in the popover so the user can
+    /// see why a provider is missing data rather than having the card vanish.
+    var erroredAgents: [AgentStatus] {
+        [claude, codex]
+            .map { agentStatus(for: $0.provider) }
+            .filter {
+                switch $0.availability {
+                case .missingAuth, .accessDenied, .sessionExpired,
+                     .notInstalled, .notLoggedIn, .error:
+                    return true
+                case .loading, .available:
+                    return false
+                }
+            }
     }
 
     func refresh() async {
@@ -97,8 +139,58 @@ final class UsageStore: ObservableObject {
         codex = resolvedCodex
         lastUpdated = Date()
 
+        recordHistory(for: resolvedClaude)
+        recordHistory(for: resolvedCodex)
+
+        // File-system scan for project attribution runs alongside refresh
+        // (not blocking it) so tests and the menu loop stay snappy.
+        Task { [weak self] in
+            await self?.refreshProjectAttribution()
+        }
+
         await notifyIfWindowRefreshed(previous: previousClaude, current: resolvedClaude)
         await notifyIfWindowRefreshed(previous: previousCodex, current: resolvedCodex)
+    }
+
+    func refreshProjectAttribution() async {
+        let cutoff = Date().addingTimeInterval(-5 * 3600) // 5h window
+        let projects = await ClaudeSessionScanner.scanRecentActivity(
+            since: cutoff,
+            limit: 5
+        )
+        topClaudeProjects = projects
+    }
+
+    /// Pacing advice for a given snapshot+window, derived from the recorded
+    /// usage history. Centralised here so views can stay declarative.
+    func pacingAdvice(for snapshot: ProviderSnapshot, kind: UsageWindowKind, now: Date = .now) -> PacingAdvice {
+        let window: UsageWindow
+        switch kind {
+        case .fiveHour: window = snapshot.fiveHour
+        case .weekly: window = snapshot.weekly
+        }
+        let key = UsageWindowKey(provider: snapshot.provider, kind: kind)
+        return PacingCoach.advise(
+            usedPercentage: window.usedPercentage,
+            resetsAt: window.resetsAt,
+            samples: history.samples(for: key),
+            now: now
+        )
+    }
+
+    private func recordHistory(for snapshot: ProviderSnapshot) {
+        var changed = false
+        if let pct = snapshot.fiveHour.usedPercentage {
+            history.record(pct, for: UsageWindowKey(provider: snapshot.provider, kind: .fiveHour))
+            changed = true
+        }
+        if let pct = snapshot.weekly.usedPercentage {
+            history.record(pct, for: UsageWindowKey(provider: snapshot.provider, kind: .weekly))
+            changed = true
+        }
+        if changed {
+            history.persist(to: userDefaults, key: historyDefaultsKey)
+        }
     }
 
     func setAutoRefreshInterval(_ interval: AutoRefreshInterval) {

@@ -67,7 +67,22 @@ struct AppTheme: Identifiable {
         codexAccent: Color(red: 0.40, green: 0.48, blue: 0.55)
     )
 
+    /// Official brand marks for each provider:
+    /// - Claude → `#D97757` — Anthropic's signature orange (same fill used in the
+    ///   official Claude SVG symbol, listed in their brand palette as the accent
+    ///   orange).
+    /// - Codex → `#0F0F0F` — OpenAI's mark is pure black `#000000`, but pure black
+    ///   renders as a near-invisible pill on a dark menu bar. `#0F0F0F` is the
+    ///   near-black OpenAI uses on their site chrome; it stays faithful to the
+    ///   monochrome brand while keeping the pill distinguishable from the bar.
+    static let brand = AppTheme(
+        id: "brand", name: "Original",
+        claudeAccent: Color(red: 0xD9 / 255.0, green: 0x77 / 255.0, blue: 0x57 / 255.0),
+        codexAccent: Color(red: 0x0F / 255.0, green: 0x0F / 255.0, blue: 0x0F / 255.0)
+    )
+
     static let all: [AppTheme] = [
+        .brand,
         .sunset, .neon, .ocean, .forest, .berry,
         .citrus, .arctic, .volcano, .aurora, .mono,
     ]
@@ -106,6 +121,31 @@ struct AppTheme: Identifiable {
             claudeAccent: AppColorHex.color(from: customClaudeAccentHex),
             codexAccent: AppColorHex.color(from: customCodexAccentHex)
         )
+    }
+}
+
+extension Color {
+    /// Perceived luminance (Rec. 601) in the 0…1 range. Used to detect accents
+    /// that are too dark to read without extra help — currently the near-black
+    /// Codex mark in the "Original" theme, but any sufficiently dark custom
+    /// accent gets the same treatment automatically.
+    var estimatedLuminance: Double {
+        guard let srgb = NSColor(self).usingColorSpace(.sRGB) else {
+            return 0.5
+        }
+        return 0.299 * Double(srgb.redComponent)
+             + 0.587 * Double(srgb.greenComponent)
+             + 0.114 * Double(srgb.blueComponent)
+    }
+
+    /// Accent color adjusted for legibility against the popover's dark material
+    /// card (`.regularMaterial` renders around `#2A2A2A` in dark mode). Near-black
+    /// accents get lifted to a graphite mid-tone so the provider dot, usage bar,
+    /// and sparkline all stay visible — while still reading as "dark monochrome"
+    /// rather than a colored accent. Brighter accents pass through unchanged.
+    var liftedForDarkBackground: Color {
+        guard estimatedLuminance < 0.18 else { return self }
+        return Color(white: 0.52)
     }
 }
 

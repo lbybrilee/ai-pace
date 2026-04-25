@@ -71,6 +71,9 @@ enum ProcessRunner {
         process.currentDirectoryURL = currentDirectory
         process.environment = environment()
 
+        let exitSemaphore = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exitSemaphore.signal() }
+
         try process.run()
 
         if let input {
@@ -79,20 +82,15 @@ enum ProcessRunner {
         try? stdin.fileHandleForWriting.close()
 
         if let timeout {
-            let deadline = Date().addingTimeInterval(timeout)
-            while process.isRunning && Date() < deadline {
-                usleep(50_000)
-            }
-
-            if process.isRunning {
+            if exitSemaphore.wait(timeout: .now() + timeout) == .timedOut, process.isRunning {
                 process.terminate()
-                usleep(100_000)
-                if process.isRunning {
+                if exitSemaphore.wait(timeout: .now() + 0.1) == .timedOut, process.isRunning {
                     process.interrupt()
+                    exitSemaphore.wait()
                 }
             }
         } else {
-            process.waitUntilExit()
+            exitSemaphore.wait()
         }
 
         let outputData = stdout.fileHandleForReading.readDataToEndOfFile()

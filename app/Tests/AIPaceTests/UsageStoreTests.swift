@@ -385,4 +385,69 @@ struct UsageStoreTests {
         #expect(!store.launchAtStartupSupported)
         #expect(store.launchAtStartupErrorMessage == "Operation not permitted")
     }
+
+    @Test
+    @MainActor
+    func refreshOnPopoverOpenRunsWhenEnabledAndSkipsWhenDisabled() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let claudeQueue = ProbeQueue([
+            makeSnapshot(.claude, fiveHourUsed: 10, weeklyUsed: 20),
+            makeSnapshot(.claude, fiveHourUsed: 30, weeklyUsed: 40),
+        ])
+        let codexQueue = ProbeQueue([
+            makeSnapshot(.codex, fiveHourUsed: 5, weeklyUsed: 15),
+            makeSnapshot(.codex, fiveHourUsed: 7, weeklyUsed: 17),
+        ])
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: claudeQueue),
+            codexProbe: ProbeStub(queue: codexQueue),
+            notificationManager: NotificationManagerSpy(),
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+        #expect(store.refreshOnOpen)
+
+        await store.refreshOnPopoverOpen()
+        #expect(store.claude.fiveHour.usedPercentage == 10)
+
+        store.setRefreshOnOpen(false)
+        await store.refreshOnPopoverOpen()
+        // Setting is off: claude snapshot must not have advanced to the next queued value.
+        #expect(store.claude.fiveHour.usedPercentage == 10)
+
+        store.setRefreshOnOpen(true)
+        await store.refreshOnPopoverOpen()
+        #expect(store.claude.fiveHour.usedPercentage == 30)
+    }
+
+    @Test
+    @MainActor
+    func refreshRecordsUsageHistory() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = UsageStore(
+            claudeProbe: ProbeStub(queue: ProbeQueue([
+                makeSnapshot(.claude, fiveHourUsed: 42, weeklyUsed: 60),
+            ])),
+            codexProbe: ProbeStub(queue: ProbeQueue([
+                makeSnapshot(.codex, fiveHourUsed: 8, weeklyUsed: 16),
+            ])),
+            notificationManager: NotificationManagerSpy(),
+            userDefaults: defaults,
+            startRefreshLoop: false
+        )
+
+        await store.refresh()
+
+        let claudeFive = store.history.samples(for: UsageWindowKey(provider: .claude, kind: .fiveHour))
+        let codexWeek = store.history.samples(for: UsageWindowKey(provider: .codex, kind: .weekly))
+        #expect(claudeFive.last?.percentage == 42)
+        #expect(codexWeek.last?.percentage == 16)
+    }
 }

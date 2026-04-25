@@ -1,6 +1,7 @@
 import Foundation
+import Security
 
-struct ClaudeOAuthCredentials: Sendable, Equatable {
+struct ClaudeOAuthCredentials: Sendable, Equatable, Codable {
     var accessToken: String
     var refreshToken: String?
     var expiresAt: Double?
@@ -27,37 +28,98 @@ enum ClaudeCredentialLoadIssue: Error, Sendable, Equatable {
     }
 }
 
-struct ClaudeCredentialResult: @unchecked Sendable {
+struct ClaudeCredentialResult: Sendable, Equatable {
     var oauth: ClaudeOAuthCredentials
     let source: ClaudeCredentialSource
-    var fullData: [String: Any]
+    /// Raw bytes of the original JSON document, preserved so top-level keys we don't
+    /// know about round-trip safely on save. Nil means "no pre-existing document".
+    var rawFileData: Data?
 }
 
-struct ClaudeCredentialResolution {
+struct ClaudeCredentialResolution: Sendable {
     let credentials: ClaudeCredentialResult?
     let issue: ClaudeCredentialLoadIssue?
 }
 
-struct ClaudeCredentialLoader {
+protocol ClaudeKeychainAccessing: Sendable {
+    func load(service: String) -> Result<Data?, ClaudeCredentialLoadIssue>
+    func save(service: String, data: Data) -> Result<Void, ClaudeCredentialLoadIssue>
+}
+
+struct ClaudeKeychain: ClaudeKeychainAccessing {
+    func load(service: String) -> Result<Data?, ClaudeCredentialLoadIssue> {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        switch status {
+        case errSecSuccess:
+            return .success(item as? Data)
+        case errSecItemNotFound:
+            return .success(nil)
+        case errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed:
+            return .failure(.keychainAccessDenied)
+        default:
+            return .failure(.keychainFailure("Claude Keychain lookup failed (OSStatus \(status))."))
+        }
+    }
+
+    func save(service: String, data: Data) -> Result<Void, ClaudeCredentialLoadIssue> {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+        ]
+        let update: [String: Any] = [kSecValueData as String: data]
+
+        let updateStatus = SecItemUpdate(query as CFDictionary, update as CFDictionary)
+        switch updateStatus {
+        case errSecSuccess:
+            return .success(())
+        case errSecItemNotFound:
+            break
+        case errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed:
+            return .failure(.keychainAccessDenied)
+        default:
+            return .failure(.keychainFailure("Claude Keychain update failed (OSStatus \(updateStatus))."))
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        switch addStatus {
+        case errSecSuccess:
+            return .success(())
+        case errSecUserCanceled, errSecAuthFailed, errSecInteractionNotAllowed:
+            return .failure(.keychainAccessDenied)
+        default:
+            return .failure(.keychainFailure("Claude Keychain add failed (OSStatus \(addStatus))."))
+        }
+    }
+}
+
+struct ClaudeCredentialLoader: Sendable {
     private let homeDirectory: URL
     private let environment: [String: String]
     private let keychainService: String
-    private let keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>?
-    private let keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)?
+    private let keychain: any ClaudeKeychainAccessing
     private static let refreshBufferMs: Double = 5 * 60 * 1000
 
     init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         keychainService: String = "Claude Code-credentials",
-        keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>? = nil,
-        keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)? = nil
+        keychain: any ClaudeKeychainAccessing = ClaudeKeychain()
     ) {
         self.homeDirectory = homeDirectory
         self.environment = environment
         self.keychainService = keychainService
-        self.keychainLoadOverride = keychainLoadOverride
-        self.keychainSaveOverride = keychainSaveOverride
+        self.keychain = keychain
     }
 
     func loadCredentials() -> ClaudeCredentialResult? {
@@ -95,11 +157,15 @@ struct ClaudeCredentialLoader {
     }
 
     func saveCredentials(_ result: ClaudeCredentialResult) {
+        guard let merged = mergedJSONData(for: result) else {
+            return
+        }
+
         switch result.source {
         case .file:
-            saveToFile(result)
+            saveToFile(data: merged)
         case .keychain:
-            saveToKeychain(result)
+            _ = keychain.save(service: keychainService, data: merged)
         case .environment:
             return
         }
@@ -113,42 +179,22 @@ struct ClaudeCredentialLoader {
         let url = credentialsFileURL()
         guard
             FileManager.default.fileExists(atPath: url.path),
-            let data = try? Data(contentsOf: url),
-            let object = try? JSONSerialization.jsonObject(with: data),
-            let root = object as? [String: Any]
+            let data = try? Data(contentsOf: url)
         else {
             return nil
         }
-        return makeCredentialResult(from: root, source: .file)
+        return parseCredentials(from: data, source: .file)
     }
 
     private func loadFromKeychain() -> Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> {
-        if let keychainLoadOverride {
-            return keychainLoadOverride
-        }
-
-        do {
-            let output = try ProcessRunner.runSync(
-                executable: "/usr/bin/security",
-                arguments: ["find-generic-password", "-s", keychainService, "-w"],
-                input: nil,
-                timeout: nil,
-                currentDirectory: nil
-            )
-
-            guard
-                let data = output.data(using: .utf8),
-                let object = try? JSONSerialization.jsonObject(with: data),
-                let root = object as? [String: Any]
-            else {
+        switch keychain.load(service: keychainService) {
+        case .success(let data):
+            guard let data else {
                 return .success(nil)
             }
-
-            return .success(makeCredentialResult(from: root, source: .keychain))
-        } catch let error as ProcessRunnerError {
-            return mapKeychainError(error)
-        } catch {
-            return .failure(.keychainFailure("Claude Keychain lookup failed: \(error.localizedDescription)"))
+            return .success(parseCredentials(from: data, source: .keychain))
+        case .failure(let issue):
+            return .failure(issue)
         }
     }
 
@@ -162,16 +208,23 @@ struct ClaudeCredentialLoader {
         }
 
         return ClaudeCredentialResult(
-            oauth: ClaudeOAuthCredentials(accessToken: token, refreshToken: nil, expiresAt: nil, subscriptionType: nil),
+            oauth: ClaudeOAuthCredentials(
+                accessToken: token,
+                refreshToken: nil,
+                expiresAt: nil,
+                subscriptionType: nil
+            ),
             source: .environment,
-            fullData: [:]
+            rawFileData: nil
         )
     }
 
-    private func makeCredentialResult(from root: [String: Any], source: ClaudeCredentialSource) -> ClaudeCredentialResult? {
+    private func parseCredentials(from data: Data, source: ClaudeCredentialSource) -> ClaudeCredentialResult? {
         guard
-            let oauth = root["claudeAiOauth"] as? [String: Any],
-            let rawToken = oauth["accessToken"] as? String
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let root = object as? [String: Any],
+            let oauthDict = root["claudeAiOauth"] as? [String: Any],
+            let rawToken = oauthDict["accessToken"] as? String
         else {
             return nil
         }
@@ -184,60 +237,32 @@ struct ClaudeCredentialLoader {
         return ClaudeCredentialResult(
             oauth: ClaudeOAuthCredentials(
                 accessToken: accessToken,
-                refreshToken: trimmed(oauth["refreshToken"] as? String),
-                expiresAt: parseExpiresAt(oauth["expiresAt"]),
-                subscriptionType: trimmed(oauth["subscriptionType"] as? String)
+                refreshToken: trimmed(oauthDict["refreshToken"] as? String),
+                expiresAt: parseExpiresAt(oauthDict["expiresAt"]),
+                subscriptionType: trimmed(oauthDict["subscriptionType"] as? String)
             ),
             source: source,
-            fullData: root
+            rawFileData: data
         )
     }
 
-    private func saveToFile(_ result: ClaudeCredentialResult) {
+    private func saveToFile(data: Data) {
         let url = credentialsFileURL()
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let root = updatedFullData(for: result) else {
-            return
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) else {
-            return
-        }
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         try? data.write(to: url, options: .atomic)
     }
 
-    private func saveToKeychain(_ result: ClaudeCredentialResult) {
-        if let keychainSaveOverride {
-            keychainSaveOverride(result)
-            return
+    private func mergedJSONData(for result: ClaudeCredentialResult) -> Data? {
+        var root: [String: Any] = [:]
+        if let rawFileData = result.rawFileData,
+           let object = try? JSONSerialization.jsonObject(with: rawFileData),
+           let existing = object as? [String: Any] {
+            root = existing
         }
 
-        guard
-            let root = updatedFullData(for: result),
-            let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted]),
-            let json = String(data: data, encoding: .utf8)
-        else {
-            return
-        }
-
-        _ = try? ProcessRunner.runSync(
-            executable: "/usr/bin/security",
-            arguments: ["delete-generic-password", "-s", keychainService],
-            input: nil,
-            timeout: 10,
-            currentDirectory: nil
-        )
-
-        _ = try? ProcessRunner.runSync(
-            executable: "/usr/bin/security",
-            arguments: ["add-generic-password", "-s", keychainService, "-w", json],
-            input: nil,
-            timeout: 10,
-            currentDirectory: nil
-        )
-    }
-
-    private func updatedFullData(for result: ClaudeCredentialResult) -> [String: Any]? {
-        var root = result.fullData
         var oauth: [String: Any] = [
             "accessToken": result.oauth.accessToken,
         ]
@@ -251,7 +276,8 @@ struct ClaudeCredentialLoader {
             oauth["subscriptionType"] = subscriptionType
         }
         root["claudeAiOauth"] = oauth
-        return root
+
+        return try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }
 
     private func parseExpiresAt(_ value: Any?) -> Double? {
@@ -275,29 +301,5 @@ struct ClaudeCredentialLoader {
         }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    func mapKeychainError(_ error: ProcessRunnerError) -> Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue> {
-        guard case .terminated(_, let output) = error else {
-            return .failure(.keychainFailure(error.localizedDescription))
-        }
-
-        let normalized = output.lowercased()
-        if normalized.contains("could not be found in the keychain") || normalized.contains("item could not be found") {
-            return .success(nil)
-        }
-
-        if normalized.contains("user interaction is not allowed")
-            || normalized.contains("authorization was denied")
-            || normalized.contains("user canceled")
-            || normalized.contains("user cancelled") {
-            return .failure(.keychainAccessDenied)
-        }
-
-        let message = output.trimmingCharacters(in: .whitespacesAndNewlines)
-        if message.isEmpty {
-            return .failure(.keychainFailure("Claude Keychain lookup failed."))
-        }
-        return .failure(.keychainFailure("Claude Keychain lookup failed: \(message)"))
     }
 }

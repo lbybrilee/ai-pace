@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct AIPaceApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @StateObject private var store = UsageStore()
+    @State private var store = UsageStore()
 
     var body: some Scene {
         let _ = appDelegate.configureIfNeeded(store: store)
