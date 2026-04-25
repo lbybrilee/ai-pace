@@ -6,6 +6,11 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-04-25
+
+### Added
+- Menu bar display name settings for Claude and Codex, limited to 7 characters each
+
 ## [1.1.1] - 2026-04-25
 
 ### Added
