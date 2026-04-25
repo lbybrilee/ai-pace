@@ -14,7 +14,7 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 ## [1.1.1] - 2026-04-25
 
 ### Added
-- Remaining percentage display options for the menu bar and popover
+- Remaining percentage display options for the menu bar and popover (Thank you @cifilter)
 
 ## [1.1.0] - 2026-04-07
 
