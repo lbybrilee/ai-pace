@@ -54,7 +54,7 @@ struct CodexProbe: Sendable {
             }
         }
 
-        try writeJSONLine([
+        try CodexJSONRPC.writeJSONLine([
             "jsonrpc": "2.0",
             "id": 1,
             "method": "initialize",
@@ -66,25 +66,25 @@ struct CodexProbe: Sendable {
             ],
         ], to: stdin.fileHandleForWriting)
 
-        _ = try await readResponse(
+        _ = try await CodexJSONRPC.readResponse(
             withID: 1,
             from: stdout.fileHandleForReading.bytes.lines
         )
 
-        try writeJSONLine([
+        try CodexJSONRPC.writeJSONLine([
             "jsonrpc": "2.0",
             "method": "initialized",
             "params": [:],
         ], to: stdin.fileHandleForWriting)
 
-        try writeJSONLine([
+        try CodexJSONRPC.writeJSONLine([
             "jsonrpc": "2.0",
             "id": 2,
             "method": "account/rateLimits/read",
             "params": [:],
         ], to: stdin.fileHandleForWriting)
 
-        let payload = try await readResponse(
+        let payload = try await CodexJSONRPC.readResponse(
             withID: 2,
             from: stdout.fileHandleForReading.bytes.lines
         )
@@ -140,46 +140,48 @@ struct CodexRateLimitWindow: Sendable, Equatable {
     let resetsAt: Date?
 }
 
-func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
-    let data = try JSONSerialization.data(withJSONObject: object)
-    handle.write(data)
-    handle.write(Data([0x0A]))
-}
-
-func readResponse<S: AsyncSequence>(
-    withID id: Int,
-    from lines: S
-) async throws -> [String: Any] where S.Element == String {
-    for try await line in lines {
-        guard !line.isEmpty, let data = line.data(using: .utf8) else {
-            continue
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            continue
-        }
-
-        guard let lineID = integerValue(json["id"]), lineID == id else {
-            continue
-        }
-
-        if let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String {
-            throw ProcessRunnerError.invalidResponse(message)
-        }
-        return json
+enum CodexJSONRPC {
+    static func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
+        let data = try JSONSerialization.data(withJSONObject: object)
+        handle.write(data)
+        handle.write(Data([0x0A]))
     }
-    throw ProcessRunnerError.invalidResponse("Codex app-server closed before returning response id \(id).")
-}
 
-func integerValue(_ value: Any?) -> Int? {
-    switch value {
-    case let number as Int:
-        return number
-    case let number as NSNumber:
-        return number.intValue
-    case let string as String:
-        return Int(string)
-    default:
-        return nil
+    static func readResponse<S: AsyncSequence>(
+        withID id: Int,
+        from lines: S
+    ) async throws -> [String: Any] where S.Element == String {
+        for try await line in lines {
+            guard !line.isEmpty, let data = line.data(using: .utf8) else {
+                continue
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                continue
+            }
+
+            guard let lineID = integerValue(json["id"]), lineID == id else {
+                continue
+            }
+
+            if let error = json["error"] as? [String: Any],
+               let message = error["message"] as? String {
+                throw ProcessRunnerError.invalidResponse(message)
+            }
+            return json
+        }
+        throw ProcessRunnerError.invalidResponse("Codex app-server closed before returning response id \(id).")
+    }
+
+    static func integerValue(_ value: Any?) -> Int? {
+        switch value {
+        case let number as Int:
+            return number
+        case let number as NSNumber:
+            return number.intValue
+        case let string as String:
+            return Int(string)
+        default:
+            return nil
+        }
     }
 }

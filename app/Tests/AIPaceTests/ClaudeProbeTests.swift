@@ -37,7 +37,7 @@ struct ClaudeProbeTests {
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
         let resolver = ClaudeAccountInfoResolver(configURL: configURL)
         let apiClient = ClaudeAPIClient(
@@ -76,7 +76,7 @@ struct ClaudeProbeTests {
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
         let apiClient = ClaudeAPIClient(
             fetchStatus: { ClaudeAuthStatus(loggedIn: true) },
@@ -134,7 +134,7 @@ struct ClaudeProbeTests {
         let loader = ClaudeCredentialLoader(
             homeDirectory: homeDirectory,
             environment: [:],
-            keychainLoadOverride: .success(nil)
+            keychain: InMemoryKeychain()
         )
         let apiClient = ClaudeAPIClient(
             fetchStatus: { ClaudeAuthStatus(loggedIn: nil) },

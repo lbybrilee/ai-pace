@@ -6,7 +6,7 @@ struct ClaudeAccountInfo: Sendable, Equatable {
     let organizationName: String?
 }
 
-struct ClaudeAccountInfoResolver {
+struct ClaudeAccountInfoResolver: Sendable {
     private let configURL: URL
 
     init(configURL: URL? = nil) {

@@ -35,7 +35,7 @@ struct CodexProbeTests {
             continuation.finish()
         }
 
-        let payload = try await readResponse(withID: 2, from: stream)
+        let payload = try await CodexJSONRPC.readResponse(withID: 2, from: stream)
 
         #expect(payload["id"] as? Int == 2)
         #expect((payload["result"] as? [String: Any]) != nil)
@@ -49,7 +49,7 @@ struct CodexProbeTests {
         }
 
         do {
-            _ = try await readResponse(withID: 2, from: stream)
+            _ = try await CodexJSONRPC.readResponse(withID: 2, from: stream)
             Issue.record("Expected invalid response error")
         } catch let error as ProcessRunnerError {
             guard case .invalidResponse(let message) = error else {
