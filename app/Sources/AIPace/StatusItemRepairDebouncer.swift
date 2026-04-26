@@ -1,17 +1,28 @@
 import Foundation
 
+enum StatusItemRepairReason: String {
+    case launch
+    case wake
+    case wakeFollowup = "wake-followup"
+    case displayChange = "display-change"
+}
+
 @MainActor
 final class StatusItemRepairDebouncer {
     private let delay: Duration
-    private let repair: @MainActor (String) -> Void
+    private let repair: @MainActor (StatusItemRepairReason) -> Void
     private var task: Task<Void, Never>?
 
-    init(delay: Duration = .milliseconds(500), repair: @escaping @MainActor (String) -> Void) {
+    init(delay: Duration = .milliseconds(500), repair: @escaping @MainActor (StatusItemRepairReason) -> Void) {
         self.delay = delay
         self.repair = repair
     }
 
-    func schedule(reason: String) {
+    deinit {
+        task?.cancel()
+    }
+
+    func schedule(reason: StatusItemRepairReason) {
         task?.cancel()
         task = Task { @MainActor [delay, repair] in
             do {
