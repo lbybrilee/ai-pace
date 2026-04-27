@@ -44,4 +44,19 @@ struct ProcessRunnerTests {
         #expect(ProcessRunner.which("demo-tool", directories: [directory.path]) == executable.path)
         #expect(ProcessRunner.which("missing-tool", directories: [directory.path]) == nil)
     }
+
+    @Test
+    func zshPathProbeUsesInteractiveLoginShell() {
+        #expect(ProcessRunner.shellPathProbeArguments(for: "/bin/zsh").prefix(2) == ["-l", "-i"])
+    }
+
+    @Test
+    func shellPathProbeOutputIgnoresStartupNoise() {
+        let output = """
+        startup warning
+        __AIPACE_PATH__/Users/example/.nvm/versions/node/v24.14.1/bin:/usr/bin
+        """
+
+        #expect(ProcessRunner.shellPath(fromProbeOutput: output) == "/Users/example/.nvm/versions/node/v24.14.1/bin:/usr/bin")
+    }
 }

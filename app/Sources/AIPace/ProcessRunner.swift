@@ -21,6 +21,8 @@ enum ProcessRunnerError: LocalizedError {
 }
 
 enum ProcessRunner {
+    private static let shellPathMarker = "__AIPACE_PATH__"
+
     static func which(_ executable: String) -> String? {
         which(executable, directories: pathDirectories())
     }
@@ -173,7 +175,7 @@ enum ProcessRunner {
             let stdout = Pipe()
 
             process.executableURL = URL(fileURLWithPath: shell)
-            process.arguments = ["-l", "-c", "printf %s \"$PATH\""]
+            process.arguments = shellPathProbeArguments(for: shell)
             process.standardOutput = stdout
             process.standardError = FileHandle.nullDevice
             process.environment = ProcessInfo.processInfo.environment
@@ -185,13 +187,36 @@ enum ProcessRunner {
                 guard process.terminationStatus == 0 else { continue }
 
                 let data = stdout.fileHandleForReading.readDataToEndOfFile()
-                let path = String(decoding: data, as: UTF8.self)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if !path.isEmpty {
+                if let path = shellPath(fromProbeOutput: String(decoding: data, as: UTF8.self)) {
                     return path
                 }
             } catch {
                 continue
+            }
+        }
+
+        return nil
+    }
+
+    static func shellPathProbeArguments(for shell: String) -> [String] {
+        let command = "printf '\\n\(shellPathMarker)%s\\n' \"$PATH\""
+        let shellName = URL(fileURLWithPath: shell).lastPathComponent
+
+        if shellName == "zsh" {
+            return ["-l", "-i", "-c", command]
+        }
+
+        return ["-l", "-c", command]
+    }
+
+    static func shellPath(fromProbeOutput output: String) -> String? {
+        for line in output.components(separatedBy: .newlines).reversed() {
+            guard let markerRange = line.range(of: shellPathMarker) else { continue }
+
+            let path = String(line[markerRange.upperBound...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !path.isEmpty {
+                return path
             }
         }
 
