@@ -33,6 +33,23 @@ struct ProcessRunnerTests {
     }
 
     @Test
+    func extractSentinelPathIgnoresRcFileNoise() {
+        let noisyOutput = """
+        Welcome banner from .zshrc
+        powerlevel10k loaded
+        __AIPACE_PATH_BEGIN__/usr/local/bin:/Users/me/.nvm/versions/node/v24.0.0/bin:/usr/bin__AIPACE_PATH_END__
+        plugin trailing output
+        """
+
+        #expect(
+            ProcessRunner.extractSentinelPath(from: noisyOutput)
+                == "/usr/local/bin:/Users/me/.nvm/versions/node/v24.0.0/bin:/usr/bin"
+        )
+        #expect(ProcessRunner.extractSentinelPath(from: "no markers here") == nil)
+        #expect(ProcessRunner.extractSentinelPath(from: "__AIPACE_PATH_BEGIN____AIPACE_PATH_END__") == nil)
+    }
+
+    @Test
     func whichFindsExecutableInSpecifiedDirectories() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
