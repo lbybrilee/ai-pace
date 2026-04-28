@@ -113,6 +113,7 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
+                self?.wakeFollowupTask?.cancel()
                 self?.scheduleStatusItemRepair(reason: .displayChange)
             }
         }
