@@ -161,6 +161,9 @@ enum ProcessRunner {
         return directories
     }
 
+    private static let pathSentinelBegin = "__AIPACE_PATH_BEGIN__"
+    private static let pathSentinelEnd = "__AIPACE_PATH_END__"
+
     private static func loginShellPath() -> String? {
         let shellCandidates = [
             ProcessInfo.processInfo.environment["SHELL"],
@@ -168,34 +171,73 @@ enum ProcessRunner {
             "/bin/bash",
         ].compactMap { $0 }
 
+        let command = "printf '\(pathSentinelBegin)%s\(pathSentinelEnd)' \"$PATH\""
+
+        // Try interactive login first so `.zshrc` / `.bashrc` is sourced — that's
+        // where nvm, rbenv, pyenv, fnm typically inject PATH on macOS. Fall back
+        // to non-interactive login if that fails (e.g., `.zshrc` errors out).
+        let argumentVariants = [
+            ["-i", "-l", "-c", command],
+            ["-l", "-c", command],
+        ]
+
         for shell in shellCandidates where FileManager.default.isExecutableFile(atPath: shell) {
-            let process = Process()
-            let stdout = Pipe()
-
-            process.executableURL = URL(fileURLWithPath: shell)
-            process.arguments = ["-l", "-c", "printf %s \"$PATH\""]
-            process.standardOutput = stdout
-            process.standardError = FileHandle.nullDevice
-            process.environment = ProcessInfo.processInfo.environment
-            process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
-
-            do {
-                try process.run()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else { continue }
-
-                let data = stdout.fileHandleForReading.readDataToEndOfFile()
-                let path = String(decoding: data, as: UTF8.self)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                if !path.isEmpty {
+            for arguments in argumentVariants {
+                if let path = runShellForPath(shell: shell, arguments: arguments) {
                     return path
                 }
-            } catch {
-                continue
             }
         }
 
         return nil
+    }
+
+    private static func runShellForPath(shell: String, arguments: [String]) -> String? {
+        let process = Process()
+        let stdout = Pipe()
+
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = stdout
+        process.standardError = FileHandle.nullDevice
+        process.environment = ProcessInfo.processInfo.environment
+        process.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+
+        do {
+            try process.run()
+
+            let deadline = Date().addingTimeInterval(5)
+            while process.isRunning && Date() < deadline {
+                usleep(50_000)
+            }
+            if process.isRunning {
+                process.terminate()
+                usleep(100_000)
+                if process.isRunning {
+                    process.interrupt()
+                }
+                return nil
+            }
+
+            guard process.terminationStatus == 0 else { return nil }
+
+            let data = stdout.fileHandleForReading.readDataToEndOfFile()
+            let output = String(decoding: data, as: UTF8.self)
+            return extractSentinelPath(from: output)
+        } catch {
+            return nil
+        }
+    }
+
+    static func extractSentinelPath(from output: String) -> String? {
+        guard let begin = output.range(of: pathSentinelBegin) else { return nil }
+        guard let end = output.range(of: pathSentinelEnd, range: begin.upperBound..<output.endIndex) else {
+            return nil
+        }
+        let path = String(output[begin.upperBound..<end.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return path.isEmpty ? nil : path
     }
 
     static func expandUserPath(
