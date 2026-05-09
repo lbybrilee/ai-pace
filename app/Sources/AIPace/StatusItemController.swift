@@ -47,7 +47,13 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
 
     private func createStatusItem(reason: StatusItemRepairReason) {
         logger.info("Creating status item: \(reason.rawValue, privacy: .public)")
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Stable identifier so menu bar managers (Bartender, Ice, etc.) can
+        // re-identify this item across rebuilds (display change, wake) and
+        // preserve the user's placement instead of treating each rebuild as
+        // a brand-new item.
+        item.autosaveName = "com.aipace.app.statusItem"
+        statusItem = item
         statusItemCreatedAt = Date()
         configureStatusItem(reason: reason)
     }
@@ -101,39 +107,74 @@ final class StatusItemController: NSObject, NSMenuDelegate, NSPopoverDelegate {
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.scheduleStatusItemRepair(reason: .wake)
-                self?.scheduleSecondWakeRepair()
+                self?.handleWake()
             }
         }
         lifecycleObservers.append((workspaceCenter, wakeObserver))
 
+        // On display change (plug/unplug external monitor, primary display
+        // swap), refresh the rendering in place instead of tearing down the
+        // status item. Recreating the item makes menu bar managers (Bartender,
+        // BetterTouchTool, Ice) lose track of its identity and re-place it
+        // under their default rule. Only fall back to a full rebuild if the
+        // button is actually broken after the screen change.
         let displayObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.wakeFollowupTask?.cancel()
-                self?.scheduleStatusItemRepair(reason: .displayChange)
+                self?.handleDisplayChange()
             }
         }
         lifecycleObservers.append((NotificationCenter.default, displayObserver))
     }
 
-    private func scheduleStatusItemRepair(reason: StatusItemRepairReason) {
-        logger.info("Scheduling status item repair: \(reason.rawValue, privacy: .public)")
-        repairDebouncer.schedule(reason: reason)
+    private func handleWake() {
+        // Refresh rendering in place after wake; only rebuild if the button
+        // is genuinely broken. A 2s follow-up check catches cases where the
+        // button comes back broken slightly after wake fires.
+        refreshOrRepair(reason: .wake)
+        scheduleWakeFollowupCheck()
     }
 
-    private func scheduleSecondWakeRepair() {
+    private func scheduleWakeFollowupCheck() {
         wakeFollowupTask?.cancel()
         wakeFollowupTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else {
                 return
             }
-            self?.rebuildStatusItem(reason: .wakeFollowup)
+            self?.refreshOrRepair(reason: .wakeFollowup)
         }
+    }
+
+    private func refreshOrRepair(reason: StatusItemRepairReason) {
+        updateButtonTitle()
+
+        // Treat the item as broken only when the AppKit-managed window is
+        // missing. Length is intentionally not part of this check: the text
+        // fallback path sets length to NSStatusItem.variableLength (a
+        // negative sentinel), which would otherwise be misclassified as
+        // broken and trigger a rebuild loop.
+        let button = statusItem?.button
+        let buttonBroken = button == nil || button?.window == nil
+        if buttonBroken {
+            logger.error("Status item button broken (\(reason.rawValue, privacy: .public)); rebuilding")
+            scheduleStatusItemRepair(reason: reason)
+        }
+    }
+
+    private func handleDisplayChange() {
+        // Cancel any pending wake follow-up so a display change during the
+        // wake grace window does not race a delayed refresh against this one.
+        wakeFollowupTask?.cancel()
+        refreshOrRepair(reason: .displayChange)
+    }
+
+    private func scheduleStatusItemRepair(reason: StatusItemRepairReason) {
+        logger.info("Scheduling status item repair: \(reason.rawValue, privacy: .public)")
+        repairDebouncer.schedule(reason: reason)
     }
 
     private func logPostRebuildState(reason: StatusItemRepairReason) {
