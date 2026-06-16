@@ -1,6 +1,8 @@
 import Foundation
 
 struct CodexProbe: Sendable {
+    private static let responseTimeout: TimeInterval = 15
+
     func fetch() async -> ProviderSnapshot {
         do {
             let limits = try await fetchRateLimits()
@@ -66,9 +68,11 @@ struct CodexProbe: Sendable {
             ],
         ], to: stdin.fileHandleForWriting)
 
-        _ = try await readResponse(
+        _ = try await readProcessResponse(
             withID: 1,
-            from: stdout.fileHandleForReading.bytes.lines
+            from: stdout.fileHandleForReading.bytes.lines,
+            process: process,
+            timeout: Self.responseTimeout
         )
 
         try writeJSONLine([
@@ -84,9 +88,11 @@ struct CodexProbe: Sendable {
             "params": [:],
         ], to: stdin.fileHandleForWriting)
 
-        let payload = try await readResponse(
+        let payload = try await readProcessResponse(
             withID: 2,
-            from: stdout.fileHandleForReading.bytes.lines
+            from: stdout.fileHandleForReading.bytes.lines,
+            process: process,
+            timeout: Self.responseTimeout
         )
         guard
             let result = payload["result"] as? [String: Any],
@@ -169,6 +175,53 @@ func readResponse<S: AsyncSequence>(
         return json
     }
     throw ProcessRunnerError.invalidResponse("Codex app-server closed before returning response id \(id).")
+}
+
+func readProcessResponse<S: AsyncSequence>(
+    withID id: Int,
+    from lines: S,
+    process: Process,
+    timeout: TimeInterval
+) async throws -> [String: Any] where S.Element == String, S: Sendable {
+    let processBox = ProcessBox(process)
+    return try await withThrowingTaskGroup(of: JSONPayload.self) { group in
+        group.addTask {
+            JSONPayload(try await readResponse(withID: id, from: lines))
+        }
+        group.addTask {
+            try await Task.sleep(for: .seconds(timeout))
+            processBox.terminateIfRunning()
+            throw ProcessRunnerError.invalidResponse("Codex app-server timed out while waiting for response id \(id).")
+        }
+
+        guard let result = try await group.next() else {
+            throw ProcessRunnerError.invalidResponse("Codex app-server closed before returning response id \(id).")
+        }
+        group.cancelAll()
+        return result.value
+    }
+}
+
+private struct JSONPayload: @unchecked Sendable {
+    let value: [String: Any]
+
+    init(_ value: [String: Any]) {
+        self.value = value
+    }
+}
+
+private final class ProcessBox: @unchecked Sendable {
+    private let process: Process
+
+    init(_ process: Process) {
+        self.process = process
+    }
+
+    func terminateIfRunning() {
+        if process.isRunning {
+            process.terminate()
+        }
+    }
 }
 
 func integerValue(_ value: Any?) -> Int? {

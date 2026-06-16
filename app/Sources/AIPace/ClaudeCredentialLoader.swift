@@ -132,7 +132,7 @@ struct ClaudeCredentialLoader {
                 executable: "/usr/bin/security",
                 arguments: ["find-generic-password", "-s", keychainService, "-w"],
                 input: nil,
-                timeout: nil,
+                timeout: 10,
                 currentDirectory: nil
             )
 
@@ -221,15 +221,7 @@ struct ClaudeCredentialLoader {
 
         _ = try? ProcessRunner.runSync(
             executable: "/usr/bin/security",
-            arguments: ["delete-generic-password", "-s", keychainService],
-            input: nil,
-            timeout: 10,
-            currentDirectory: nil
-        )
-
-        _ = try? ProcessRunner.runSync(
-            executable: "/usr/bin/security",
-            arguments: ["add-generic-password", "-s", keychainService, "-w", json],
+            arguments: ["add-generic-password", "-U", "-s", keychainService, "-w", json],
             input: nil,
             timeout: 10,
             currentDirectory: nil

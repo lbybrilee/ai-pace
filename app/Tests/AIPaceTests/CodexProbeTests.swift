@@ -61,4 +61,23 @@ struct CodexProbeTests {
             Issue.record("Unexpected error: \(error)")
         }
     }
+
+    @Test
+    func readProcessResponseTimesOutWhenNoMatchingPayloadArrives() async {
+        let stream = AsyncStream<String> { _ in }
+        let process = Process()
+
+        do {
+            _ = try await readProcessResponse(withID: 3, from: stream, process: process, timeout: 0.01)
+            Issue.record("Expected timeout error")
+        } catch let error as ProcessRunnerError {
+            guard case .invalidResponse(let message) = error else {
+                Issue.record("Unexpected error type: \(error)")
+                return
+            }
+            #expect(message == "Codex app-server timed out while waiting for response id 3.")
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
 }
