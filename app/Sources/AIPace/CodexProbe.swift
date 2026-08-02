@@ -4,22 +4,7 @@ struct CodexProbe: Sendable {
     func fetch() async -> ProviderSnapshot {
         do {
             let limits = try await fetchRateLimits()
-            return ProviderSnapshot(
-                provider: .codex,
-                fiveHour: UsageWindow(
-                    kind: .fiveHour,
-                    usedPercentage: limits.primary?.usedPercent,
-                    resetsAt: limits.primary?.resetsAt,
-                    message: limits.primary == nil ? "No 5h limit returned." : nil
-                ),
-                weekly: UsageWindow(
-                    kind: .weekly,
-                    usedPercentage: limits.secondary?.usedPercent,
-                    resetsAt: limits.secondary?.resetsAt,
-                    message: limits.secondary == nil ? "No weekly limit returned." : nil
-                ),
-                detail: limits.planType.map { "Plan: \($0)" }
-            )
+            return snapshot(from: limits)
         } catch {
             return ProviderSnapshot(
                 provider: .codex,
@@ -28,6 +13,28 @@ struct CodexProbe: Sendable {
                 detail: nil
             )
         }
+    }
+
+    func snapshot(from limits: CodexRateLimits) -> ProviderSnapshot {
+        let fiveHour = limits.fiveHour
+        let weekly = limits.weekly
+
+        return ProviderSnapshot(
+            provider: .codex,
+            fiveHour: UsageWindow(
+                kind: .fiveHour,
+                usedPercentage: fiveHour?.usedPercent,
+                resetsAt: fiveHour?.resetsAt,
+                message: fiveHour == nil ? "No 5h limit returned." : nil
+            ),
+            weekly: UsageWindow(
+                kind: .weekly,
+                usedPercentage: weekly?.usedPercent,
+                resetsAt: weekly?.resetsAt,
+                message: weekly == nil ? "No weekly limit returned." : nil
+            ),
+            detail: limits.planType.map { "Plan: \($0)" }
+        )
     }
 
     private func fetchRateLimits() async throws -> CodexRateLimits {
@@ -110,7 +117,12 @@ struct CodexProbe: Sendable {
             return nil
         }
         let resetsAt = numericValue(window["resetsAt"]).map(Date.init(timeIntervalSince1970:))
-        return CodexRateLimitWindow(usedPercent: usedPercent, resetsAt: resetsAt)
+        let windowDurationMins = numericValue(window["windowDurationMins"])
+        return CodexRateLimitWindow(
+            usedPercent: usedPercent,
+            resetsAt: resetsAt,
+            windowDurationMins: windowDurationMins
+        )
     }
 
     func numericValue(_ value: Any?) -> Double? {
@@ -133,11 +145,28 @@ struct CodexRateLimits {
     let primary: CodexRateLimitWindow?
     let secondary: CodexRateLimitWindow?
     let planType: String?
+
+    var fiveHour: CodexRateLimitWindow? {
+        window(withDurationMinutes: 5 * 60)
+            ?? primary.flatMap { $0.windowDurationMins == nil ? $0 : nil }
+    }
+
+    var weekly: CodexRateLimitWindow? {
+        window(withDurationMinutes: 7 * 24 * 60)
+            ?? secondary.flatMap { $0.windowDurationMins == nil ? $0 : nil }
+    }
+
+    private func window(withDurationMinutes duration: Double) -> CodexRateLimitWindow? {
+        [primary, secondary]
+            .compactMap { $0 }
+            .first { $0.windowDurationMins == duration }
+    }
 }
 
 struct CodexRateLimitWindow: Sendable, Equatable {
     let usedPercent: Double
     let resetsAt: Date?
+    let windowDurationMins: Double?
 }
 
 func writeJSONLine(_ object: [String: Any], to handle: FileHandle) throws {
