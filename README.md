@@ -64,10 +64,9 @@ AIPace finds your Claude credentials by checking these locations in order:
 2. macOS Keychain service `Claude Code-credentials`
 3. `CLAUDE_CODE_OAUTH_TOKEN` environment variable
 
-Then it calls:
+AIPace calls the usage endpoint at `https://api.anthropic.com/api/oauth/usage`.
 
-- Usage endpoint: `https://api.anthropic.com/api/oauth/usage`
-- Refresh endpoint: `https://platform.claude.com/v1/oauth/token`
+AIPace treats these credentials as read-only. Claude Code alone owns token refresh and credential updates, preventing refresh-token rotation races between the two apps.
 
 It also reads `~/.claude.json -> oauthAccount` for display info only.
 

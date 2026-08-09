@@ -42,10 +42,6 @@ struct ClaudeProbeTests {
         let resolver = ClaudeAccountInfoResolver(configURL: configURL)
         let apiClient = ClaudeAPIClient(
             fetchStatus: { ClaudeAuthStatus(loggedIn: nil) },
-            refreshToken: { credentials, _ in
-                Issue.record("refreshToken should not be called for fresh credentials")
-                return credentials
-            },
             fetchUsage: { _ in
                 ClaudeUsageResponse(
                     fiveHour: ClaudeQuotaData(utilization: 25, resetsAt: "2026-04-06T12:00:00Z"),
@@ -80,7 +76,6 @@ struct ClaudeProbeTests {
         )
         let apiClient = ClaudeAPIClient(
             fetchStatus: { ClaudeAuthStatus(loggedIn: true) },
-            refreshToken: { credentials, _ in credentials },
             fetchUsage: { _ in
                 Issue.record("fetchUsage should not be called when credentials are missing")
                 return ClaudeUsageResponse(fiveHour: nil, sevenDay: nil)
@@ -98,18 +93,12 @@ struct ClaudeProbeTests {
     }
 
     @Test
-    func fetchRetriesAfterAuthenticationFailureForRefreshableCredentials() async throws {
+    func fetchDoesNotRefreshClaudeOwnedCredentialsAfterAuthenticationFailure() async throws {
         actor State {
             var usageTokens: [String] = []
-            var refreshCalls = 0
 
-            func recordUsageToken(_ token: String) -> Int {
+            func recordUsageToken(_ token: String) {
                 usageTokens.append(token)
-                return usageTokens.count
-            }
-
-            func recordRefresh() {
-                refreshCalls += 1
             }
         }
 
@@ -138,21 +127,9 @@ struct ClaudeProbeTests {
         )
         let apiClient = ClaudeAPIClient(
             fetchStatus: { ClaudeAuthStatus(loggedIn: nil) },
-            refreshToken: { credentials, _ in
-                await state.recordRefresh()
-                var updated = credentials
-                updated.oauth.accessToken = "new-token"
-                return updated
-            },
             fetchUsage: { token in
-                let call = await state.recordUsageToken(token)
-                if call == 1 {
-                    throw ProcessRunnerError.invalidResponse("Claude authentication failed.")
-                }
-                return ClaudeUsageResponse(
-                    fiveHour: ClaudeQuotaData(utilization: 30, resetsAt: "2026-04-06T12:00:00Z"),
-                    sevenDay: ClaudeQuotaData(utilization: 55, resetsAt: "2026-04-12T12:00:00Z")
-                )
+                await state.recordUsageToken(token)
+                throw ProcessRunnerError.invalidResponse("Claude authentication failed.")
             }
         )
 
@@ -162,11 +139,10 @@ struct ClaudeProbeTests {
             apiClient: apiClient
         ).fetch()
 
-        #expect(snapshot.fiveHour.usedPercentage == 30)
-        #expect(snapshot.weekly.usedPercentage == 55)
+        #expect(snapshot.fiveHour.usedPercentage == nil)
+        #expect(snapshot.weekly.usedPercentage == nil)
+        #expect(snapshot.fiveHour.message == "Claude authentication failed.")
         let usageTokens = await state.usageTokens
-        let refreshCalls = await state.refreshCalls
-        #expect(usageTokens == ["old-token", "new-token"])
-        #expect(refreshCalls == 1)
+        #expect(usageTokens == ["old-token"])
     }
 }

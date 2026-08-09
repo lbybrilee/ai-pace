@@ -33,8 +33,6 @@ struct ClaudeCredentialLoaderTests {
 
         #expect(resolution.credentials?.source == .file)
         #expect(resolution.credentials?.oauth.accessToken == "file-token")
-        #expect(resolution.credentials?.oauth.refreshToken == "refresh-token")
-        #expect(resolution.credentials?.oauth.expiresAt == 12345)
         #expect(resolution.credentials?.oauth.subscriptionType == "pro")
     }
 
@@ -53,58 +51,6 @@ struct ClaudeCredentialLoaderTests {
 
         #expect(resolution.credentials?.source == .environment)
         #expect(resolution.credentials?.oauth.accessToken == "env-token")
-    }
-
-    @Test
-    func needsRefreshHonorsExpiryBuffer() {
-        let loader = ClaudeCredentialLoader(
-            homeDirectory: FileManager.default.homeDirectoryForCurrentUser,
-            environment: [:],
-            keychainLoadOverride: .success(nil)
-        )
-
-        let now = Date().timeIntervalSince1970 * 1000
-        let fresh = ClaudeOAuthCredentials(accessToken: "token", refreshToken: nil, expiresAt: now + 10 * 60 * 1000, subscriptionType: nil)
-        let expiring = ClaudeOAuthCredentials(accessToken: "token", refreshToken: nil, expiresAt: now + 4 * 60 * 1000, subscriptionType: nil)
-
-        #expect(!loader.needsRefresh(fresh))
-        #expect(loader.needsRefresh(expiring))
-        #expect(loader.needsRefresh(ClaudeOAuthCredentials(accessToken: "token", refreshToken: nil, expiresAt: nil, subscriptionType: nil)))
-    }
-
-    @Test
-    func saveCredentialsWritesUpdatedFileContents() throws {
-        let homeDirectory = try makeTemporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: homeDirectory) }
-
-        let loader = ClaudeCredentialLoader(
-            homeDirectory: homeDirectory,
-            environment: [:],
-            keychainLoadOverride: .success(nil)
-        )
-        let result = ClaudeCredentialResult(
-            oauth: ClaudeOAuthCredentials(
-                accessToken: "updated-token",
-                refreshToken: "updated-refresh",
-                expiresAt: 999,
-                subscriptionType: "claude_max"
-            ),
-            source: .file,
-            fullData: ["existing": "value"]
-        )
-
-        loader.saveCredentials(result)
-
-        let credentialsURL = homeDirectory.appendingPathComponent(".claude/.credentials.json")
-        let data = try Data(contentsOf: credentialsURL)
-        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let oauth = try #require(object["claudeAiOauth"] as? [String: Any])
-
-        #expect(object["existing"] as? String == "value")
-        #expect(oauth["accessToken"] as? String == "updated-token")
-        #expect(oauth["refreshToken"] as? String == "updated-refresh")
-        #expect(oauth["expiresAt"] as? Double == 999)
-        #expect(oauth["subscriptionType"] as? String == "claude_max")
     }
 
     @Test

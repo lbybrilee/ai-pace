@@ -2,8 +2,6 @@ import Foundation
 
 struct ClaudeOAuthCredentials: Sendable, Equatable {
     var accessToken: String
-    var refreshToken: String?
-    var expiresAt: Double?
     var subscriptionType: String?
 }
 
@@ -27,10 +25,9 @@ enum ClaudeCredentialLoadIssue: Error, Sendable, Equatable {
     }
 }
 
-struct ClaudeCredentialResult: @unchecked Sendable {
+struct ClaudeCredentialResult: Sendable {
     var oauth: ClaudeOAuthCredentials
     let source: ClaudeCredentialSource
-    var fullData: [String: Any]
 }
 
 struct ClaudeCredentialResolution {
@@ -43,21 +40,17 @@ struct ClaudeCredentialLoader {
     private let environment: [String: String]
     private let keychainService: String
     private let keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>?
-    private let keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)?
-    private static let refreshBufferMs: Double = 5 * 60 * 1000
 
     init(
         homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         keychainService: String = "Claude Code-credentials",
-        keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>? = nil,
-        keychainSaveOverride: (@Sendable (ClaudeCredentialResult) -> Void)? = nil
+        keychainLoadOverride: Result<ClaudeCredentialResult?, ClaudeCredentialLoadIssue>? = nil
     ) {
         self.homeDirectory = homeDirectory
         self.environment = environment
         self.keychainService = keychainService
         self.keychainLoadOverride = keychainLoadOverride
-        self.keychainSaveOverride = keychainSaveOverride
     }
 
     func loadCredentials() -> ClaudeCredentialResult? {
@@ -83,25 +76,6 @@ struct ClaudeCredentialLoader {
             return ClaudeCredentialResolution(credentials: nil, issue: nil)
         case .failure(let issue):
             return ClaudeCredentialResolution(credentials: nil, issue: issue)
-        }
-    }
-
-    func needsRefresh(_ oauth: ClaudeOAuthCredentials) -> Bool {
-        guard let expiresAt = oauth.expiresAt else {
-            return true
-        }
-        let nowMs = Date().timeIntervalSince1970 * 1000
-        return nowMs + Self.refreshBufferMs >= expiresAt
-    }
-
-    func saveCredentials(_ result: ClaudeCredentialResult) {
-        switch result.source {
-        case .file:
-            saveToFile(result)
-        case .keychain:
-            saveToKeychain(result)
-        case .environment:
-            return
         }
     }
 
@@ -162,9 +136,8 @@ struct ClaudeCredentialLoader {
         }
 
         return ClaudeCredentialResult(
-            oauth: ClaudeOAuthCredentials(accessToken: token, refreshToken: nil, expiresAt: nil, subscriptionType: nil),
-            source: .environment,
-            fullData: [:]
+            oauth: ClaudeOAuthCredentials(accessToken: token, subscriptionType: nil),
+            source: .environment
         )
     }
 
@@ -184,89 +157,10 @@ struct ClaudeCredentialLoader {
         return ClaudeCredentialResult(
             oauth: ClaudeOAuthCredentials(
                 accessToken: accessToken,
-                refreshToken: trimmed(oauth["refreshToken"] as? String),
-                expiresAt: parseExpiresAt(oauth["expiresAt"]),
                 subscriptionType: trimmed(oauth["subscriptionType"] as? String)
             ),
-            source: source,
-            fullData: root
+            source: source
         )
-    }
-
-    private func saveToFile(_ result: ClaudeCredentialResult) {
-        let url = credentialsFileURL()
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard let root = updatedFullData(for: result) else {
-            return
-        }
-        guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) else {
-            return
-        }
-        try? data.write(to: url, options: .atomic)
-    }
-
-    private func saveToKeychain(_ result: ClaudeCredentialResult) {
-        if let keychainSaveOverride {
-            keychainSaveOverride(result)
-            return
-        }
-
-        guard
-            let root = updatedFullData(for: result),
-            let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted]),
-            let json = String(data: data, encoding: .utf8)
-        else {
-            return
-        }
-
-        _ = try? ProcessRunner.runSync(
-            executable: "/usr/bin/security",
-            arguments: ["delete-generic-password", "-s", keychainService],
-            input: nil,
-            timeout: 10,
-            currentDirectory: nil
-        )
-
-        _ = try? ProcessRunner.runSync(
-            executable: "/usr/bin/security",
-            arguments: ["add-generic-password", "-s", keychainService, "-w", json],
-            input: nil,
-            timeout: 10,
-            currentDirectory: nil
-        )
-    }
-
-    private func updatedFullData(for result: ClaudeCredentialResult) -> [String: Any]? {
-        var root = result.fullData
-        var oauth: [String: Any] = [
-            "accessToken": result.oauth.accessToken,
-        ]
-        if let refreshToken = result.oauth.refreshToken {
-            oauth["refreshToken"] = refreshToken
-        }
-        if let expiresAt = result.oauth.expiresAt {
-            oauth["expiresAt"] = expiresAt
-        }
-        if let subscriptionType = result.oauth.subscriptionType {
-            oauth["subscriptionType"] = subscriptionType
-        }
-        root["claudeAiOauth"] = oauth
-        return root
-    }
-
-    private func parseExpiresAt(_ value: Any?) -> Double? {
-        switch value {
-        case let number as Double:
-            return number
-        case let number as Int:
-            return Double(number)
-        case let number as NSNumber:
-            return number.doubleValue
-        case let string as String:
-            return Double(string)
-        default:
-            return nil
-        }
     }
 
     private func trimmed(_ value: String?) -> String? {
