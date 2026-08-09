@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project follows semantic versi
 
 ## [Unreleased]
 
+### Fixed
+
+- Treat Claude credentials as read-only so AIPace cannot rotate or rewrite Claude Code's OAuth tokens
+
 ## [1.1.2] - 2026-04-25
 
 ### Added

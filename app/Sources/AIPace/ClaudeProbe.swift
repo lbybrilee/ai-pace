@@ -20,7 +20,7 @@ struct ClaudeProbe: Sendable {
             let accountInfo = accountInfoResolver.resolve()
             let resolution = credentialLoader.resolveCredentials()
 
-            guard var credentials = resolution.credentials else {
+            guard let credentials = resolution.credentials else {
                 if let issue = resolution.issue {
                     throw ProcessRunnerError.invalidResponse(issue.message)
                 }
@@ -30,29 +30,8 @@ struct ClaudeProbe: Sendable {
                 throw ProcessRunnerError.invalidResponse("Claude credentials not found.")
             }
 
-            if credentialLoader.needsRefresh(credentials.oauth) {
-                if credentials.source == .environment {
-                    // setup-token style credentials have no refresh flow; use them as-is
-                } else if credentials.oauth.refreshToken != nil {
-                    credentials = try await apiClient.refreshToken(credentials, credentialLoader)
-                } else {
-                    throw ProcessRunnerError.invalidResponse("Claude session expired; log in again.")
-                }
-            }
-
-            let usage: ClaudeUsageResponse
-            do {
-                usage = try await apiClient.fetchUsage(credentials.oauth.accessToken)
-            } catch let error as ProcessRunnerError {
-                if shouldRetryAfterAuthenticationError(error),
-                   credentials.source != .environment,
-                   credentials.oauth.refreshToken != nil {
-                    credentials = try await apiClient.refreshToken(credentials, credentialLoader)
-                    usage = try await apiClient.fetchUsage(credentials.oauth.accessToken)
-                } else {
-                    throw error
-                }
-            }
+            // Claude Code owns token rotation. A usage monitor must never consume or rewrite its refresh token.
+            let usage = try await apiClient.fetchUsage(credentials.oauth.accessToken)
             return ProviderSnapshot(
                 provider: .claude,
                 fiveHour: UsageWindow(
@@ -87,59 +66,6 @@ struct ClaudeProbe: Sendable {
             timeout: 10
         )
         return try JSONDecoder().decode(ClaudeAuthStatus.self, from: Data(output.utf8))
-    }
-
-    static func liveRefreshToken(
-        _ credentials: ClaudeCredentialResult,
-        credentialLoader: ClaudeCredentialLoader
-    ) async throws -> ClaudeCredentialResult {
-        guard let refreshToken = credentials.oauth.refreshToken else {
-            return credentials
-        }
-
-        var request = URLRequest(url: URL(string: "https://platform.claude.com/v1/oauth/token")!)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 20
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "grant_type": "refresh_token",
-            "refresh_token": refreshToken,
-            "client_id": "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-            "scope": "user:profile user:inference user:sessions:claude_code",
-        ])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw ProcessRunnerError.invalidResponse("Claude refresh endpoint returned an invalid response.")
-        }
-
-        if http.statusCode == 400 || http.statusCode == 401 {
-            if let payload = try? JSONDecoder().decode(ClaudeRefreshErrorResponse.self, from: data),
-               payload.error == "invalid_grant" {
-                throw ProcessRunnerError.invalidResponse("Claude session expired; log in again.")
-            }
-            throw ProcessRunnerError.invalidResponse("Claude session expired; log in again.")
-        }
-
-        guard (200 ..< 300).contains(http.statusCode) else {
-            throw ProcessRunnerError.invalidResponse("Claude token refresh failed with HTTP \(http.statusCode).")
-        }
-
-        let payload = try JSONDecoder().decode(ClaudeRefreshResponse.self, from: data)
-        guard let accessToken = payload.accessToken?.trimmingCharacters(in: .whitespacesAndNewlines), !accessToken.isEmpty else {
-            throw ProcessRunnerError.invalidResponse("Claude token refresh returned no access token.")
-        }
-
-        var updated = credentials
-        updated.oauth.accessToken = accessToken
-        if let refreshToken = payload.refreshToken {
-            updated.oauth.refreshToken = refreshToken
-        }
-        if let expiresIn = payload.expiresIn {
-            updated.oauth.expiresAt = Date().timeIntervalSince1970 * 1000 + Double(expiresIn) * 1000
-        }
-        credentialLoader.saveCredentials(updated)
-        return updated
     }
 
     static func liveFetchUsage(with accessToken: String) async throws -> ClaudeUsageResponse {
@@ -209,26 +135,17 @@ struct ClaudeProbe: Sendable {
         }
     }
 
-    func shouldRetryAfterAuthenticationError(_ error: ProcessRunnerError) -> Bool {
-        guard case .invalidResponse(let message) = error else {
-            return false
-        }
-        return message == "Claude authentication failed."
-    }
 }
 
 struct ClaudeAPIClient: Sendable {
     let fetchStatus: @Sendable () async throws -> ClaudeAuthStatus
-    let refreshToken: @Sendable (ClaudeCredentialResult, ClaudeCredentialLoader) async throws -> ClaudeCredentialResult
     let fetchUsage: @Sendable (String) async throws -> ClaudeUsageResponse
 
     init(
         fetchStatus: @escaping @Sendable () async throws -> ClaudeAuthStatus = ClaudeProbe.liveFetchStatus,
-        refreshToken: @escaping @Sendable (ClaudeCredentialResult, ClaudeCredentialLoader) async throws -> ClaudeCredentialResult = ClaudeProbe.liveRefreshToken,
         fetchUsage: @escaping @Sendable (String) async throws -> ClaudeUsageResponse = ClaudeProbe.liveFetchUsage(with:)
     ) {
         self.fetchStatus = fetchStatus
-        self.refreshToken = refreshToken
         self.fetchUsage = fetchUsage
     }
 }
@@ -255,22 +172,6 @@ struct ClaudeQuotaData: Decodable, Sendable {
         case utilization
         case resetsAt = "resets_at"
     }
-}
-
-struct ClaudeRefreshResponse: Decodable, Sendable {
-    let accessToken: String?
-    let refreshToken: String?
-    let expiresIn: Int?
-
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case expiresIn = "expires_in"
-    }
-}
-
-struct ClaudeRefreshErrorResponse: Decodable, Sendable {
-    let error: String?
 }
 
 private extension String {
