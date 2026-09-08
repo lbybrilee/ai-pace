@@ -40,7 +40,7 @@ struct CodexProbe: Sendable {
         let stdout = Pipe()
 
         process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = ["-s", "read-only", "-a", "untrusted", "app-server"]
+        process.arguments = ["-s", "read-only", "-a", "never", "app-server"]
         process.standardInput = stdin
         process.standardOutput = stdout
         process.standardError = FileHandle.nullDevice
