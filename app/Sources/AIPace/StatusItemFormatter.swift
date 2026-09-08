@@ -17,20 +17,24 @@ enum StatusItemFormatter {
     }
 
     static func text(prefix: String, snapshot: ProviderSnapshot, mode: MenuBarDisplayMode) -> String {
+        let windows = snapshot.fiveHour.usedPercentage == nil && snapshot.weekly.usedPercentage != nil
+            ? [snapshot.weekly]
+            : [snapshot.fiveHour, snapshot.weekly]
+
         switch mode {
         case .usage:
-            return "\(prefix) \(compactValue(for: snapshot.fiveHour))/\(compactValue(for: snapshot.weekly))"
+            return "\(prefix) \(windows.map(compactValue).joined(separator: "/"))"
         case .remaining:
-            return "\(prefix) \(compactRemainingValue(for: snapshot.fiveHour))/\(compactRemainingValue(for: snapshot.weekly))"
+            return "\(prefix) \(windows.map(compactRemainingValue).joined(separator: "/"))"
         case .insight:
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(insight)"
         case .usageAndInsight:
-            let usage = "\(compactValue(for: snapshot.fiveHour))/\(compactValue(for: snapshot.weekly))"
+            let usage = windows.map(compactValue).joined(separator: "/")
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(usage) \(insight)"
         case .remainingAndInsight:
-            let remaining = "\(compactRemainingValue(for: snapshot.fiveHour))/\(compactRemainingValue(for: snapshot.weekly))"
+            let remaining = windows.map(compactRemainingValue).joined(separator: "/")
             let insight = WeeklyPacing.formattedDelta(for: snapshot.weekly) ?? "--"
             return "\(prefix) \(remaining) \(insight)"
         }
