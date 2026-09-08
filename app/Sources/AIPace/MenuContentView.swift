@@ -817,7 +817,7 @@ private struct AgentStatusRow: View {
             return .green
         case .loading:
             return .secondary
-        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn:
+        case .missingAuth, .accessDenied, .sessionExpired, .notInstalled, .notLoggedIn, .rateLimited:
             return .orange
         case .error:
             return .red
